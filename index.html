@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Turbo Rush - 3D Arcade Racing</title>
+  
+  <!-- Modern Racing Typography -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Orbitron:wght@600;700;800;900&display=swap" rel="stylesheet">
+  
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏎️</text></svg>">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- 3D WebGL Canvas Container -->
+  <div id="canvas-container"></div>
+
+  <!-- WORKSHOP GARAGE SCREEN -->
+  <div id="workshop-screen" class="screen-overlay" style="display: none;">
+    
+    <div class="workshop-header">
+      <h1 class="workshop-title">PREMIUM WORKSHOP</h1>
+    </div>
+
+    <div class="workshop-left-panel">
+      <h2 id="ws-car-name">Falcon S1</h2>
+      <div id="ws-car-mfg">AeroDrive</div>
+      <div class="ws-badge" id="ws-car-class">Starter</div>
+      <p id="ws-car-desc" class="ws-desc">A balanced and beginner-friendly compact sports coupe.</p>
+    </div>
+
+    <div class="workshop-right-panel">
+      <h3>PERFORMANCE RATING</h3>
+      <div class="stat-row">
+        <span class="stat-label">Top Speed</span>
+        <div class="stat-bar-bg"><div class="stat-bar-fill" id="ws-stat-speed"></div></div>
+        <span class="stat-val" id="ws-val-speed">55</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">Acceleration</span>
+        <div class="stat-bar-bg"><div class="stat-bar-fill" id="ws-stat-accel"></div></div>
+        <span class="stat-val" id="ws-val-accel">58</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">Braking</span>
+        <div class="stat-bar-bg"><div class="stat-bar-fill" id="ws-stat-brake"></div></div>
+        <span class="stat-val" id="ws-val-brake">68</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">Handling</span>
+        <div class="stat-bar-bg"><div class="stat-bar-fill" id="ws-stat-handling"></div></div>
+        <span class="stat-val" id="ws-val-handling">72</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">Grip</span>
+        <div class="stat-bar-bg"><div class="stat-bar-fill" id="ws-stat-grip"></div></div>
+        <span class="stat-val" id="ws-val-grip">70</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">Stability</span>
+        <div class="stat-bar-bg"><div class="stat-bar-fill" id="ws-stat-stability"></div></div>
+        <span class="stat-val" id="ws-val-stability">75</span>
+      </div>
+    </div>
+
+    <div class="workshop-footer">
+      <button class="ws-btn" id="btn-prev-car">◀ PREV</button>
+      
+      <div class="ws-actions">
+        <button class="ws-btn primary" id="btn-select-car">SELECT CAR</button>
+        <button class="ws-btn success hidden" id="btn-start-race">START RACE 🏁</button>
+      </div>
+
+      <button class="ws-btn" id="btn-next-car">NEXT ▶</button>
+    </div>
+  </div>
+
+  <!-- MAP SELECTION SCREEN -->
+  <div id="map-select-screen" class="screen-overlay hidden" style="display: none;">
+
+    <!-- Hero Background Image -->
+    <div class="ms-hero" id="ms-hero-image">
+      <div class="ms-hero-overlay" id="ms-hero-overlay"></div>
+    </div>
+
+    <!-- Left Panel: Map Info -->
+    <div class="ms-info-panel">
+      <div class="ms-header-label">SELECT CIRCUIT</div>
+      <h1 class="ms-map-name" id="ms-map-name">Helios Rift</h1>
+      <p class="ms-map-subtitle" id="ms-map-subtitle">"The sun remembers everything."</p>
+
+      <div class="ms-meta-row">
+        <span class="ms-badge ms-badge-diff" id="ms-difficulty">Medium</span>
+        <span class="ms-badge ms-badge-size" id="ms-size">Medium-Large</span>
+      </div>
+
+      <div class="ms-tags" id="ms-tags"></div>
+
+      <p class="ms-map-desc" id="ms-map-desc">A desert canyon concealing the ruins of an ancient solar civilization.</p>
+
+      <!-- Mode & Weather Selector Bar -->
+      <div class="ms-options-bar">
+        <div class="ms-select-group">
+          <span class="ms-select-label">RACE MODE</span>
+          <select id="ms-mode-select" class="ms-styled-select">
+            <option value="arcade">Arcade (Standard 4-Car)</option>
+            <option value="timetrial">Time Trial (Solo + Ghost)</option>
+            <option value="team">Team Racing (2v2 Red vs Blue)</option>
+            <option value="practice">Practice (Infinite)</option>
+            <option value="tutorial">Flight Academy (Tutorial)</option>
+          </select>
+        </div>
+
+        <div class="ms-select-group">
+          <span class="ms-select-label">ATMOSPHERE / WEATHER</span>
+          <select id="ms-weather-select" class="ms-styled-select">
+            <option value="clear">Neon Twilight (Clear)</option>
+            <option value="rain">Acid Rainstorm</option>
+            <option value="fog">Cyber Mist (Fog)</option>
+            <option value="storm">Plasma Lightning Storm</option>
+            <option value="energy">Quantum Energy Surge</option>
+            <option value="night">Midnight Eclipse</option>
+          </select>
+        </div>
+
+        <button class="ms-multiplayer-btn" id="btn-open-multiplayer">MULTIPLAYER ROOMS 🌐</button>
+      </div>
+
+      <div class="ms-style-hint">
+        <span class="ms-style-label">RECOMMENDED</span>
+        <span class="ms-style-text" id="ms-style">Tactical movement and controlled rotations</span>
+      </div>
+    </div>
+
+    <!-- Right Panel: Map Cards -->
+    <div class="ms-cards-panel">
+      <div class="ms-cards-title">CIRCUITS</div>
+      <div class="ms-card-container" id="ms-card-container"></div>
+    </div>
+
+    <!-- Bottom Controls -->
+    <div class="ms-bottom-bar">
+      <button class="ws-btn" id="ms-btn-back">◀ BACK TO GARAGE</button>
+      <button class="ws-btn primary" id="ms-btn-start">START RACE 🏁</button>
+    </div>
+
+  </div>
+
+  <!-- In-Game HUD Overlay -->
+  <div id="hud" style="display: none;">
+    
+    <!-- TOP BAR -->
+    <div class="hud-top">
+      <!-- Position Indicator -->
+      <div class="hud-panel position-badge">
+        <span class="pos-num" id="pos-num">1</span>
+        <span class="pos-suffix">ST</span>
+        <span class="total-racers">/ 4</span>
+      </div>
+
+      <!-- Lap & Timer Stats -->
+      <div class="hud-panel race-stats">
+        <div class="stat-item">
+          <span class="stat-label">Lap</span>
+          <span class="stat-value" id="lap-num">1/3</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">Time</span>
+          <span class="stat-value" id="time-num">00:00.00</span>
+        </div>
+      </div>
+
+      <!-- Quick Action Buttons -->
+      <div class="hud-actions">
+        <div class="hud-cash" id="cash-display">₡ 5000</div>
+        <button class="hud-btn hud-btn-mainmenu" id="btn-main-menu" title="Return to Main Menu (M)">
+          <span class="hud-btn-icon">🏠</span>
+          <span class="hud-btn-label">MAIN MENU</span>
+        </button>
+        <button class="hud-btn" id="btn-cam-toggle" title="Toggle Camera (C)">🎥</button>
+        <button class="hud-btn" id="btn-sound" title="Toggle Sound">🔊</button>
+        <button class="hud-btn" id="btn-reset" title="Respawn Car (R)">🔄</button>
+        <button class="hud-btn" id="btn-settings" title="Settings (ESC)">⚙️</button>
+      </div>
+    </div>
+
+    <!-- TIME TRIAL SPLIT DELTA -->
+    <div id="split-hud">±0.00s</div>
+
+    <!-- TEAM RACING SCORE -->
+    <div id="team-score-hud">
+      <div class="team-card red">RED: <span id="team-red-score">0</span> PTS</div>
+      <div class="team-card blue">BLUE: <span id="team-blue-score">0</span> PTS</div>
+    </div>
+
+    <!-- CENTER NOTIFICATIONS -->
+    <div class="hud-center">
+      <div id="drift-alert" style="display: none;">
+        <div class="drift-title">DRIFT BONUS</div>
+        <div class="drift-score" id="drift-score">+150</div>
+      </div>
+      <div id="wrong-way">⚠️ WRONG WAY! ⚠️</div>
+      <div id="cash-pickup-notify" class="cash-pickup-notify" style="display: none;">+250 ₡</div>
+      <div id="checkpoint-missed" class="checkpoint-missed-notify" style="display: none;">⚠ CHECKPOINT MISSED</div>
+      <div id="penalty-timer" class="penalty-timer" style="display: none;">PENALTY 3.0s</div>
+    </div>
+
+    <!-- CHECKPOINT COUNTER -->
+    <div id="checkpoint-display" class="hud-checkpoint">CP 0/16</div>
+
+    <!-- BOTTOM BAR -->
+    <div class="hud-bottom">
+      <!-- Dynamic Minimap -->
+      <div class="minimap-wrapper">
+        <canvas id="minimap-canvas"></canvas>
+      </div>
+
+      <!-- Cockpit: Nitro Gauge & Digital Speedometer -->
+      <div class="cockpit-cluster">
+        <!-- Nitro Bar -->
+        <div class="nitro-container">
+          <div id="nitro-tier-badge" class="nitro-tier-badge">READY</div>
+          <div class="nitro-bar-bg">
+            <div class="nitro-sweet-spot" id="nitro-sweet-spot"></div>
+            <div class="nitro-bar-fill" id="nitro-fill" style="height: 100%;"></div>
+          </div>
+          <span class="nitro-label">NITRO</span>
+        </div>
+
+        <!-- Digital Speedometer -->
+        <div class="speedometer-gauge">
+          <div class="gear-badge" id="gear-num">1</div>
+          <div class="speed-digital" id="speed-num">0</div>
+          <div class="speed-unit">KM / H</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MOBILE VIRTUAL TOUCH CONTROLS -->
+    <div id="mobile-controls">
+      <div class="mobile-left-cluster">
+        <button class="touch-btn" id="touch-left">◀</button>
+        <button class="touch-btn" id="touch-right">▶</button>
+      </div>
+      <div class="mobile-right-cluster">
+        <button class="touch-btn btn-brake" id="touch-brake">BRAKE</button>
+        <button class="touch-btn btn-gas" id="touch-gas">GAS</button>
+        <button class="touch-btn btn-nitro" id="touch-nitro">NITRO</button>
+      </div>
+      <div class="mobile-top-cluster">
+        <button class="touch-btn btn-sm" id="touch-menu" title="Main Menu">🏠</button>
+        <button class="touch-btn btn-sm" id="touch-cam">🎥</button>
+        <button class="touch-btn btn-sm" id="touch-reset">🔄</button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- COUNTDOWN SCREEN (3, 2, 1, GO!) -->
+  <div id="countdown-screen" class="screen-overlay hidden">
+    <div id="countdown-text">3</div>
+  </div>
+
+  <!-- SETTINGS MODAL -->
+  <div id="settings-modal">
+    <div class="settings-card">
+      <div class="settings-title">
+        <span>SETTINGS</span>
+        <button class="settings-close-btn" id="settings-close">✕</button>
+      </div>
+
+      <div class="settings-row">
+        <label>Graphics Quality</label>
+        <select id="settings-graphics">
+          <option value="low">Low (Optimized)</option>
+          <option value="medium">Medium</option>
+          <option value="high" selected>High (Recommended)</option>
+          <option value="ultra">Ultra (Max FX)</option>
+        </select>
+      </div>
+
+      <div class="settings-row">
+        <label>Camera Field of View</label>
+        <input type="range" id="settings-fov" min="60" max="95" value="75" step="1">
+      </div>
+
+      <div class="settings-row">
+        <label>3D Racing Line</label>
+        <label class="settings-toggle">
+          <input type="checkbox" id="settings-racing-line" checked>
+          <span>Enabled</span>
+        </label>
+      </div>
+
+      <div class="settings-row">
+        <label>Screen Shake FX</label>
+        <label class="settings-toggle">
+          <input type="checkbox" id="settings-shake" checked>
+          <span>Enabled</span>
+        </label>
+      </div>
+
+      <div class="settings-row">
+        <label>Master Volume</label>
+        <input type="range" id="settings-vol-master" min="0" max="1" value="1.0" step="0.05">
+      </div>
+
+      <div class="settings-row">
+        <label>Music Volume</label>
+        <input type="range" id="settings-vol-music" min="0" max="1" value="0.7" step="0.05">
+      </div>
+
+      <div class="settings-row">
+        <label>SFX Volume</label>
+        <input type="range" id="settings-vol-sfx" min="0" max="1" value="0.85" step="0.05">
+      </div>
+
+      <div class="settings-row">
+        <label>Announcer Voice</label>
+        <input type="range" id="settings-vol-voice" min="0" max="1" value="0.9" step="0.05">
+      </div>
+
+      <div style="display: flex; gap: 12px; margin-top: 14px; flex-wrap: wrap;">
+        <button class="ws-btn danger" id="btn-settings-main-menu" style="flex: 1; min-width: 130px; font-size: 0.85rem; padding: 10px;">MAIN MENU 🏠</button>
+        <button class="ws-btn" id="btn-replay-tutorial" style="flex: 1; min-width: 130px; font-size: 0.85rem; padding: 10px;">REPLAY TUTORIAL</button>
+        <button class="ws-btn primary" id="btn-save-settings" style="flex: 1; min-width: 130px; font-size: 0.85rem; padding: 10px;">RESUME ▶</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- QUIT / MAIN MENU CONFIRMATION MODAL -->
+  <div id="quit-confirm-modal" class="screen-overlay hidden" style="display: none; z-index: 105;">
+    <div class="modal-card quit-confirm-card">
+      <div class="quit-icon-badge">🏠</div>
+      <h1 class="modal-title" style="margin-top: 10px; font-size: 1.8rem;">RETURN TO MAIN MENU?</h1>
+      <p class="modal-subtitle">Current race session will be abandoned. Return to the vehicle garage & showroom?</p>
+      <div class="quit-modal-actions">
+        <button class="ws-btn" id="btn-cancel-quit" style="flex: 1; font-size: 0.95rem; padding: 12px 18px;">◀ RESUME RACE</button>
+        <button class="ws-btn danger" id="btn-confirm-quit" style="flex: 1; font-size: 0.95rem; padding: 12px 18px;">CONFIRM & EXIT 🏠</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- RACE FINISH / VICTORY SCREEN -->
+  <div id="finish-modal" class="screen-overlay hidden">
+    <div class="modal-card">
+      <h1 class="modal-title">RACE FINISHED!</h1>
+      <p class="modal-subtitle">Total Race Time: <strong id="final-time">00:00.00</strong></p>
+      <div id="best-lap-display" class="best-lap-display" style="display: none;">
+        <span class="best-lap-label">BEST LAP</span>
+        <span id="best-lap-time" class="best-lap-time">00:00.00</span>
+        <span id="new-record-badge" class="new-record-badge" style="display: none;">★ NEW RECORD ★</span>
+      </div>
+
+      <div class="leaderboard-list" id="leaderboard-container">
+        <!-- Dynamically generated -->
+      </div>
+
+      <div class="earnings-breakdown" id="earnings-breakdown">
+        <div class="earnings-title">RACE EARNINGS</div>
+        <div class="earnings-rows" id="earnings-rows"></div>
+        <div class="earnings-total">
+          <span>TOTAL</span>
+          <span id="earnings-total-value">+0 ₡</span>
+        </div>
+      </div>
+
+      <div class="finish-buttons">
+        <button class="btn-primary" id="btn-restart">RACE AGAIN 🏁</button>
+        <button class="btn-secondary" id="btn-return-garage">RETURN TO GARAGE 🔧</button>
+      </div>
+
+      <div class="controls-hint">
+        <span><span class="key-badge">W / ↑</span> Gas</span>
+        <span><span class="key-badge">S / ↓</span> Brake / Reverse</span>
+        <span><span class="key-badge">A / D</span> Steer</span>
+        <span><span class="key-badge">SPACE</span> Drift</span>
+        <span><span class="key-badge">SHIFT</span> Nitro</span>
+        <span><span class="key-badge">C</span> Camera</span>
+        <span><span class="key-badge">R</span> Respawn</span>
+        <span><span class="key-badge">T</span> Racing Line</span>
+        <span><span class="key-badge">ESC</span> Settings</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Three.js (r128) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+
+  <!-- Three.js Post-Processing Engine -->
+  <script src="js/lib/CopyShader.js"></script>
+  <script src="js/lib/LuminosityHighPassShader.js"></script>
+  <script src="js/lib/EffectComposer.js"></script>
+  <script src="js/lib/RenderPass.js"></script>
+  <script src="js/lib/ShaderPass.js"></script>
+  <script src="js/lib/UnrealBloomPass.js"></script>
+  <script src="js/renderingPipeline.js"></script>
+
+  <!-- Turbo Rush Subsystems in Dependency Order -->
+  <script src="js/saveManager.js"></script>
+  <script src="js/audio.js"></script>
+  <script src="js/track.js"></script>
+  <script src="js/car.js"></script>
+  <script src="js/carData.js"></script>
+  <!-- Bujji Hero Car Assets -->
+  <script src="assets/vehicles/bujji/bujjiTextures.js"></script>
+  <script src="assets/vehicles/bujji/bujjiAudio.js"></script>
+  <script src="assets/vehicles/bujji/bujjiModel.js"></script>
+  <!-- Emerald Highway Track Modules -->
+  <script src="assets/tracks/emerald_highway/emeraldHighwayData.js"></script>
+  <script src="assets/tracks/emerald_highway/emeraldHighwayGeometry.js"></script>
+  <script src="assets/tracks/emerald_highway/emeraldHighwayTraffic.js"></script>
+  <script src="assets/tracks/emerald_highway/emeraldHighwayScenery.js"></script>
+  <script src="assets/tracks/emerald_highway/emeraldHighwayAudio.js"></script>
+  <script src="js/mapData.js"></script>
+  <script src="js/physics.js"></script>
+  <script src="js/ai.js"></script>
+  <script src="js/camera.js"></script>
+  <script src="js/trackProps.js"></script>
+  <script src="js/destructibles.js"></script>
+  <script src="js/racingLine.js"></script>
+  <script src="js/tutorial.js"></script>
+  <script src="js/raceModes.js"></script>
+  <script src="js/weather.js"></script>
+  <script src="js/replay.js"></script>
+  <script src="js/multiplayer.js"></script>
+  <script src="js/hud.js"></script>
+  <script src="js/streaming.js"></script>
+  <script src="js/damage.js"></script>
+  <script src="js/workshop.js"></script>
+  <script src="js/mapSelect.js"></script>
+  <script src="js/game.js"></script>
+
+</body>
+</html>
