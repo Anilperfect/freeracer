@@ -1,52 +1,70 @@
-# Turbo Rush: 3D Arcade Racing
+# FreeRacer — Neon Coast
 
-A high-fidelity 3D arcade racing game running directly in the browser with WebGL and Three.js.
+An original open-world arcade racing game for desktop browsers. Plain JavaScript + Three.js (r128),
+no build step — every car, brand, district and track is fictional and generated procedurally.
 
-## 🏁 Play Online
-Experience the game directly on GitHub Pages:
-**`https://<your-username>.github.io/<repository-name>/`**
+**Play:** serve the folder with any static server and open `index.html`
 
----
+```bash
+cd freeracer
+python3 -m http.server 8080      # then visit http://localhost:8080
+```
 
-## 🏎️ Features
-- **4 Distinct Circuits**: Helios Rift, Emerald Highway, Drowned Meridian, and Thornwild Crown.
-- **Dynamic Weather**: Neon Twilight, Acid Rainstorm, Cyber Mist, Plasma Lightning Storm, Quantum Surge, and Midnight Eclipse.
-- **Multiple Race Modes**: Arcade 4-Car Race, Time Trial, Team Racing (2v2), Practice, and Tutorial.
-- **Supercars & Garage**: Detailed vehicles including Kairo Pulse S, V8 GT, V12 Stradale, and Bujji with customizable performance ratings.
-- **Post-Processing & Bloom**: Unreal Bloom, dynamic motion blur, high-speed FOV warping, and camera shake.
-- **Synthesized Audio Engine**: Real-time procedural engine revs, turbo blow-off, nitro boost hiss, tyre screeches, and soundtrack.
-- **Responsive Controls**: Full desktop keyboard controls and mobile virtual touch buttons.
+## What's in v0.2.0 (Phase 1 vertical slice)
 
----
+* **Title → Main menu → Drive** — free roam in **Apex Downtown**, the first district of Neon Coast
+  (7×7 road grid, 300 neon buildings, plaza, waterfront, stadium, garage).
+* **Free-body driving model** — gears, drift/handbrake, nitro tiers, surface grip, collisions with
+  buildings/props/traffic, assists (Beginner / Standard / Expert).
+* **5 street events** — sprints, a harbor run, a 3-lap circuit and a time attack, unlocked by reputation.
+  Route markers, gates, countdown, standings, medals, results screen.
+* **Traffic** and **AI rivals** that follow the road network.
+* **Credits + Reputation** (10 levels) → unlocks; **discovery landmarks**.
+* **Garage** — 5 cars (Kinetix, Veloce, Ordnance Hero Works), paint/finish/rims/underglow/flame,
+  7-stat upgrades — all applied in the open world.
+* **Circuit Events** — the original anti-gravity circuits (4 tracks, 5 modes, weather, replay) are kept
+  intact and reachable from the main menu.
+* **Save v3** in localStorage with schema versioning, legacy-save migration and corrupt-data recovery.
 
-## 🎮 Controls
+## Controls
 
-### Desktop Keyboard
-| Key | Action |
-| --- | --- |
-| **W** / **Up Arrow** | Accelerate / Gas |
-| **S** / **Down Arrow** | Brake / Reverse |
-| **A** / **Left Arrow** | Steer Left |
-| **D** / **Right Arrow** | Steer Right |
-| **Spacebar** | Drift / Handbrake |
-| **Left Shift** | Nitro Boost |
-| **C** | Switch Camera Angle (Chase / Hood / Orbit) |
-| **R** | Respawn / Reset Car to Track |
-| **T** | Toggle 3D Racing Line |
-| **M** | Return to Main Menu / Garage |
-| **ESC** | Pause / Settings Menu |
+| Action | Keyboard | Gamepad |
+| --- | --- | --- |
+| Accelerate / Brake-reverse | W / ↑ · S / ↓ | RT (or A) · LT (or X) |
+| Steer | A / D · ← / → | Left stick / D-pad ← → |
+| Handbrake | Space | B / LB |
+| Nitro | Shift | RB (or Y while moving) |
+| Interact (start event / garage) | E or Enter | Y while stopped at a marker |
+| Reset to road | R | Back |
+| Camera | C | D-pad ↑ |
+| Full map / minimap rotation | M / N | D-pad ↓ / — |
+| Pause | Esc | Start |
 
-### Mobile / Touch
-- On-screen touch buttons for steering, gas, brake, nitro, camera switch, and menu.
+## Project layout
 
----
+```
+index.html                 screens + script order
+css/style.css
+js/game.js                 GameEngine (state machine, circuit loop, settings)
+js/mainMenu.js             title, main menu, credits
+js/openworld/              road network, district data, world builder, physics, traffic, AI,
+                           events, HUD, manager (free roam)
+js/*.js                    garage, cars, audio, camera, circuit mode (track/physics/ai/…)
+tools/smoke-test.js        headless regression test (jsdom + Three.js math, stubbed WebGL)
+FREERACER_GDD.md           game design document
+TECHNICAL_ARCHITECTURE.md  systems & data formats
+DEVELOPMENT_ROADMAP.md     phases and status
+```
 
-## 🚀 Deployment Instructions (GitHub Pages)
+## Headless test
 
-1. Upload or push this folder's contents to your GitHub repository.
-2. In your GitHub repository, navigate to **Settings** > **Pages**.
-3. Under **Build and deployment**:
-   - **Source**: Select `Deploy from a branch`.
-   - **Branch**: Select `main` (or your default branch) and folder `/ (root)`.
-   - Click **Save**.
-4. GitHub Pages will build and deploy your site in ~1-2 minutes!
+```bash
+mkdir -p /tmp/frtest && cd /tmp/frtest && npm install jsdom@24 three@0.128.0
+cd /path/to/freeracer
+FREERACER_NODE_MODULES=/tmp/frtest/node_modules node tools/smoke-test.js --frames=600 --soak=60
+```
+
+## Notes
+
+* No real-money purchases; progress is stored only in your browser.
+* Multiplayer rooms need a relay server that is not part of this repository — the button is disabled.

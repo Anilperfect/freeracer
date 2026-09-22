@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Turbo Rush - 3D Arcade Racing</title>
+  <title>FreeRacer — Neon Coast</title>
   
   <!-- Modern Racing Typography -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Orbitron:wght@600;700;800;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Orbitron:wght@600;700;800;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
   
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏎️</text></svg>">
   <link rel="stylesheet" href="css/style.css">
@@ -18,11 +18,67 @@
   <!-- 3D WebGL Canvas Container -->
   <div id="canvas-container"></div>
 
+  <!-- TITLE SCREEN -->
+  <div id="title-screen" class="screen-overlay title-screen">
+    <div class="title-glow"></div>
+    <div class="title-stack">
+      <div class="title-kicker">NEON COAST</div>
+      <h1 class="title-logo">FREE<span>RACER</span></h1>
+      <div class="title-sub">OPEN-WORLD ARCADE RACING · APEX DOWNTOWN</div>
+      <div class="title-hint" id="title-hint">BUILDING NEON COAST…</div>
+      <div class="title-status" id="title-status"></div>
+    </div>
+  </div>
+
+  <!-- MAIN MENU -->
+  <div id="main-menu" class="screen-overlay main-menu hidden" style="display: none;">
+    <div class="mm-left">
+      <div class="mm-logo">FREE<span>RACER</span></div>
+      <div class="mm-tag">Neon Coast · Apex Downtown</div>
+      <nav class="mm-nav">
+        <button class="mm-btn primary" id="btn-mm-drive"><span class="mm-btn-title">DRIVE</span><span class="mm-btn-sub" id="btn-mm-drive-sub">Free roam · Apex Downtown</span></button>
+        <button class="mm-btn" id="btn-mm-garage"><span class="mm-btn-title">GARAGE</span><span class="mm-btn-sub">Cars · Upgrades · Paint</span></button>
+        <button class="mm-btn" id="btn-mm-circuits"><span class="mm-btn-title">CIRCUIT EVENTS</span><span class="mm-btn-sub">Anti-gravity circuits · 4 tracks</span></button>
+        <button class="mm-btn" id="btn-mm-settings"><span class="mm-btn-title">SETTINGS</span><span class="mm-btn-sub">Graphics · Audio · Camera</span></button>
+        <button class="mm-btn" id="btn-mm-credits"><span class="mm-btn-title">CREDITS</span><span class="mm-btn-sub">About FreeRacer</span></button>
+      </nav>
+      <div class="mm-controls">W/↑ gas · S/↓ brake · A/D steer · Space handbrake · Shift nitro · E interact · R reset · C camera · M map · Esc pause</div>
+      <div class="mm-version" id="mm-version"></div>
+    </div>
+    <div class="mm-right">
+      <div class="mm-card">
+        <div class="mm-card-title">DRIVER PROFILE</div>
+        <div id="mm-profile"></div>
+        <button class="mm-link" id="btn-mm-reset-save">Reset profile</button>
+      </div>
+      <div class="mm-flash hidden" id="mm-flash"></div>
+    </div>
+  </div>
+
+  <!-- CREDITS -->
+  <div id="credits-modal" class="screen-overlay hidden">
+    <div class="modal-card credits-card">
+      <h1 class="modal-title">FREERACER</h1>
+      <p class="modal-subtitle">An original open-world arcade racer. Every manufacturer, car, district and track in this game is fictional.</p>
+      <div class="credits-body">
+        <p><strong>Manufacturers of Neon Coast</strong> — Kinetix Dynamics · Veloce Performance · Ordnance Hero Works · (coming) Veyra · Kairo · Voltrix · Radian · Monarch · Apex Forge</p>
+        <p><strong>Technology</strong> — Three.js (MIT) rendering · procedural WebAudio engine & music · hand-built vehicle, traffic and world systems · no external art or music assets</p>
+        <p><strong>Modes</strong> — Open world (Apex Downtown) · Circuit Events (anti-gravity heritage tracks)</p>
+        <p class="credits-small">No real-money purchases. Progress is stored locally in your browser.</p>
+      </div>
+      <button class="ws-btn primary" id="btn-credits-close">CLOSE</button>
+    </div>
+  </div>
+
   <!-- WORKSHOP GARAGE SCREEN -->
   <div id="workshop-screen" class="screen-overlay" style="display: none;">
     
     <div class="workshop-header">
-      <h1 class="workshop-title">PREMIUM WORKSHOP</h1>
+      <h1 class="workshop-title">FREERACER GARAGE</h1>
+      <div class="workshop-nav">
+        <button class="ws-btn" id="btn-ws-main-menu" title="Back to main menu">◀ MAIN MENU</button>
+        <button class="ws-btn success" id="btn-ws-drive" title="Drive the selected car in Apex Downtown">DRIVE ▶</button>
+      </div>
     </div>
 
     <div class="workshop-left-panel">
@@ -71,7 +127,7 @@
       
       <div class="ws-actions">
         <button class="ws-btn primary" id="btn-select-car">SELECT CAR</button>
-        <button class="ws-btn success hidden" id="btn-start-race">START RACE 🏁</button>
+        <button class="ws-btn success hidden" id="btn-start-race">CIRCUIT EVENTS 🏁</button>
       </div>
 
       <button class="ws-btn" id="btn-next-car">NEXT ▶</button>
@@ -126,7 +182,7 @@
           </select>
         </div>
 
-        <button class="ms-multiplayer-btn" id="btn-open-multiplayer">MULTIPLAYER ROOMS 🌐</button>
+        <button class="ms-multiplayer-btn" id="btn-open-multiplayer" disabled title="Online rooms need a relay server that is not part of this build">MULTIPLAYER — UNAVAILABLE (NO SERVER) 🌐</button>
       </div>
 
       <div class="ms-style-hint">
@@ -259,6 +315,85 @@
 
   </div>
 
+  <!-- OPEN-WORLD HUD LAYER -->
+  <div id="ow-hud" class="hidden">
+    <div class="ow-topleft">
+      <div class="ow-street" id="ow-street">Apex Downtown</div>
+      <div class="ow-rep" id="ow-rep">LV 1 · Rookie</div>
+      <div class="ow-rep-bar"><div class="ow-rep-fill" id="ow-rep-fill"></div></div>
+    </div>
+    <div class="ow-event-panel hidden" id="ow-event-panel">
+      <div class="ow-event-name" id="ow-event-name">Plaza Sprint</div>
+      <div class="ow-event-meta" id="ow-event-meta">SPRINT</div>
+      <div class="ow-event-timer" id="ow-event-timer">00:00.00</div>
+      <div class="ow-event-row"><span id="ow-event-pos">1ST / 4</span><span id="ow-event-cp">CP 0/6</span></div>
+      <div class="ow-cp-nav"><div class="ow-cp-arrow" id="ow-cp-arrow">➤</div><span id="ow-cp-dist">0 m</span></div>
+    </div>
+    <div class="ow-off-route hidden" id="ow-off-route">RETURN TO THE ROUTE</div>
+    <div class="ow-checkpoint-flash hidden" id="ow-checkpoint-flash">CHECKPOINT</div>
+    <div class="ow-prompt hidden" id="ow-prompt"><span class="ow-key" id="ow-prompt-key">E</span><div><div class="ow-prompt-text" id="ow-prompt-text">Start event</div><div class="ow-prompt-sub" id="ow-prompt-sub"></div></div></div>
+    <div class="ow-toasts" id="ow-toasts"></div>
+    <div class="ow-fps" id="ow-fps"></div>
+    <button class="hud-btn ow-pause-btn" id="btn-ow-hud-pause" title="Pause (Esc)">⏸</button>
+  </div>
+
+  <!-- OPEN-WORLD PAUSE MENU -->
+  <div id="ow-pause" class="screen-overlay hidden">
+    <div class="modal-card ow-menu-card">
+      <h1 class="modal-title">PAUSED</h1>
+      <p class="modal-subtitle" id="ow-pause-stats"></p>
+      <div class="ow-menu-buttons">
+        <button class="ws-btn primary" id="btn-ow-resume">RESUME ▶</button>
+        <button class="ws-btn" id="btn-ow-restart-event">RESTART EVENT</button>
+        <button class="ws-btn danger" id="btn-ow-quit-event">ABANDON EVENT</button>
+        <button class="ws-btn" id="btn-ow-garage">GARAGE</button>
+        <button class="ws-btn" id="btn-ow-settings">SETTINGS</button>
+        <button class="ws-btn danger" id="btn-ow-main-menu">MAIN MENU 🏠</button>
+      </div>
+      <div class="ow-menu-options">
+        <label>Driving assists
+          <select id="ow-assist-level">
+            <option value="beginner">Beginner (stability + traction + counter-steer)</option>
+            <option value="standard" selected>Standard (balanced)</option>
+            <option value="expert">Expert (no assists)</option>
+          </select>
+        </label>
+        <label>Traffic density
+          <select id="ow-traffic-density">
+            <option value="off">Off</option>
+            <option value="light">Light</option>
+            <option value="normal" selected>Normal</option>
+            <option value="heavy">Heavy</option>
+          </select>
+        </label>
+      </div>
+      <div class="ow-menu-controls">W/↑ gas · S/↓ brake · A/D steer · Space handbrake · Shift nitro · E interact · R reset · C camera · M map · N minimap rotation · Esc pause</div>
+    </div>
+  </div>
+
+  <!-- OPEN-WORLD EVENT RESULTS -->
+  <div id="ow-results" class="screen-overlay hidden">
+    <div class="modal-card ow-results-card">
+      <div class="ow-results-kicker">EVENT COMPLETE</div>
+      <h1 class="modal-title" id="ow-results-title">Plaza Sprint</h1>
+      <div class="ow-results-position medal-none" id="ow-results-position">1ST PLACE</div>
+      <div class="ow-results-time" id="ow-results-time">00:00.00</div>
+      <div class="ow-results-tags" id="ow-results-tags"></div>
+      <div class="ow-results-standings" id="ow-results-standings"></div>
+      <div class="ow-results-rewards">
+        <div class="ow-reward credits" id="ow-results-credits">+₡0</div>
+        <div class="ow-reward rep" id="ow-results-rep">+0 REP</div>
+      </div>
+      <div class="ow-results-level" id="ow-results-level"></div>
+      <div class="ow-rep-bar wide"><div class="ow-rep-fill" id="ow-results-level-fill"></div></div>
+      <div class="ow-menu-buttons row">
+        <button class="ws-btn" id="btn-ow-results-retry">RETRY (R)</button>
+        <button class="ws-btn" id="btn-ow-results-garage">GARAGE</button>
+        <button class="ws-btn primary" id="btn-ow-results-continue">CONTINUE (ENTER) ▶</button>
+      </div>
+    </div>
+  </div>
+
   <!-- COUNTDOWN SCREEN (3, 2, 1, GO!) -->
   <div id="countdown-screen" class="screen-overlay hidden">
     <div id="countdown-text">3</div>
@@ -336,7 +471,7 @@
     <div class="modal-card quit-confirm-card">
       <div class="quit-icon-badge">🏠</div>
       <h1 class="modal-title" style="margin-top: 10px; font-size: 1.8rem;">RETURN TO MAIN MENU?</h1>
-      <p class="modal-subtitle">Current race session will be abandoned. Return to the vehicle garage & showroom?</p>
+      <p class="modal-subtitle">The current race will be abandoned and you will return to the main menu.</p>
       <div class="quit-modal-actions">
         <button class="ws-btn" id="btn-cancel-quit" style="flex: 1; font-size: 0.95rem; padding: 12px 18px;">◀ RESUME RACE</button>
         <button class="ws-btn danger" id="btn-confirm-quit" style="flex: 1; font-size: 0.95rem; padding: 12px 18px;">CONFIRM & EXIT 🏠</button>
@@ -400,7 +535,7 @@
   <script src="js/lib/UnrealBloomPass.js"></script>
   <script src="js/renderingPipeline.js"></script>
 
-  <!-- Turbo Rush Subsystems in Dependency Order -->
+  <!-- FreeRacer subsystems in dependency order (circuit heritage modules first) -->
   <script src="js/saveManager.js"></script>
   <script src="js/audio.js"></script>
   <script src="js/track.js"></script>
@@ -433,6 +568,20 @@
   <script src="js/damage.js"></script>
   <script src="js/workshop.js"></script>
   <script src="js/mapSelect.js"></script>
+
+  <!-- FreeRacer open world -->
+  <script src="js/openworld/roadNetwork.js"></script>
+  <script src="js/openworld/collisionGrid.js"></script>
+  <script src="js/openworld/districts/apexDowntown.js"></script>
+  <script src="js/openworld/districts/apexDowntownEvents.js"></script>
+  <script src="js/openworld/worldBuilder.js"></script>
+  <script src="js/openworld/freeVehiclePhysics.js"></script>
+  <script src="js/openworld/trafficSystem.js"></script>
+  <script src="js/openworld/openWorldAI.js"></script>
+  <script src="js/openworld/eventSystem.js"></script>
+  <script src="js/openworld/openWorldHUD.js"></script>
+  <script src="js/openworld/openWorldManager.js"></script>
+  <script src="js/mainMenu.js"></script>
   <script src="js/game.js"></script>
 
 </body>
