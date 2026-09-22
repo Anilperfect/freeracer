@@ -1,9 +1,10 @@
 // ============================================================================
-// TURBO RUSH - CORE GAME ENGINE & RACE COORDINATOR
+// FREERACER - CORE GAME ENGINE & STATE COORDINATOR
 // ============================================================================
-// Integrates 3D anti-gravity physics, AI rivals, realistic procedural supercars,
-// camera views, HUD, track props, destructibles, racing line, weather systems,
-// race modes (Arcade, Time Trial, Team Racing), private multiplayer, and audio.
+// States: TITLE → MAIN_MENU → FREE_ROAM (open world, events) | WORKSHOP (garage)
+//         | MAP_SELECT → COUNTDOWN → RACING → FINISHED (circuit events)
+// Integrates the open-world manager, anti-gravity circuit physics, AI rivals,
+// procedural cars, camera, HUD, weather, replay, and audio.
 
 class GameEngine {
   constructor() {
@@ -20,6 +21,10 @@ class GameEngine {
     this.aiRacers = [];
     this.workshop = null;
     this.mapSelect = null;
+    this.openWorld = null;
+    this.mainMenu = null;
+    this.garageReturnTo = 'menu';
+    this.settingsReturnState = null;
 
     // New Modular Systems
     this.trackProps = null;
@@ -32,7 +37,7 @@ class GameEngine {
     this.multiplayer = null;
 
     // Race State
-    this.gameState = 'WORKSHOP'; // WORKSHOP, MAP_SELECT, COUNTDOWN, RACING, PAUSED, FINISHED, REPLAY
+    this.gameState = 'TITLE'; // TITLE, MAIN_MENU, FREE_ROAM, WORKSHOP, MAP_SELECT, COUNTDOWN, RACING, PAUSED, FINISHED, REPLAY
     this.raceTime = 0;
     this.playerLap = 1;
     this.maxLaps = 3;
@@ -95,14 +100,120 @@ class GameEngine {
     this.raceModes = new window.RaceModesManager(this);
     this.multiplayer = new window.MultiplayerClient(this);
 
-    // Start in Workshop Mode
-    this.gameState = 'WORKSHOP';
     this.workshop = new window.WorkshopManager(this);
     this.mapSelect = new window.MapSelectManager(this);
-    this.workshop.enterWorkshop();
+    this.bindGarageNav();
+
+    // Open world + title/main menu
+    this.openWorld = window.OpenWorldManager ? new window.OpenWorldManager(this) : null;
+    this.mainMenu = window.MainMenuManager ? new window.MainMenuManager(this) : null;
+    if (this.mainMenu && this.openWorld) {
+      this.mainMenu.showTitle();
+    } else {
+      // Fallback: legacy flow straight into the garage
+      this.gameState = 'WORKSHOP';
+      this.workshop.enterWorkshop();
+    }
 
     // Start render loop
     requestAnimationFrame(this.animate.bind(this));
+  }
+
+  // ─────────────────────────────────────────────
+  // FLOW: Title / Main Menu / Free Roam / Garage
+  // ─────────────────────────────────────────────
+  bindGarageNav() {
+    const menuBtn = document.getElementById('btn-ws-main-menu');
+    if (menuBtn) menuBtn.addEventListener('click', () => this.goToMainMenu());
+    const driveBtn = document.getElementById('btn-ws-drive');
+    if (driveBtn) driveBtn.addEventListener('click', () => {
+      if (!this.openWorld) return;
+      this.hideWorkshop();
+      this.enterFreeRoam({ spawn: this.garageReturnTo === 'world' ? 'garage' : 'last' });
+    });
+  }
+
+  restoreStudioLighting() {
+    this.scene.background = new THREE.Color(0x0a1122);
+    this.scene.fog = new THREE.FogExp2(0x0a1122, 0.0035);
+    if (this.sceneLight_hemi) { this.sceneLight_hemi.color.setHex(0xddeeff); this.sceneLight_hemi.groundColor.setHex(0x112233); this.sceneLight_hemi.intensity = 0.7; }
+    if (this.sceneLight_dir) { this.sceneLight_dir.color.setHex(0xfffaed); this.sceneLight_dir.intensity = 1.8; this.sceneLight_dir.position.set(80, 140, 60); this.sceneLight_dir.castShadow = true; }
+    this.renderer.toneMappingExposure = 1.15;
+    if (this.pipeline && this.pipeline.bloomPass) { this.pipeline.bloomPass.threshold = 0.82; this.pipeline.bloomPass.strength = 0.55; this.pipeline.bloomPass.radius = 0.45; }
+    this.camera.far = 1200;
+    this.camera.fov = 72;
+    this.camera.updateProjectionMatrix();
+  }
+
+  enterFreeRoam(opts = {}) {
+    if (!this.openWorld) return;
+    if (this.mainMenu) this.mainMenu.disposeMenuTraffic();
+    this.hideWorkshop();
+    const ms = document.getElementById('map-select-screen');
+    if (ms) { ms.style.display = 'none'; ms.classList.add('hidden'); }
+    this.gameState = 'FREE_ROAM';
+    this.chaseCamera = null;
+    this.hud = null;
+    const carId = opts.carId || (window.SaveManager ? window.SaveManager.getSelectedCarId() : this.selectedCarId);
+    this.selectedCarId = carId;
+    this.openWorld.enter({ carId, spawn: opts.spawn || 'last' });
+  }
+
+  enterGarageFromWorld() {
+    if (this.openWorld) this.openWorld.exit();
+    this.garageReturnTo = 'world';
+    this.showGarage();
+  }
+
+  enterGarageFromMenu() {
+    if (this.openWorld) this.openWorld.detach();
+    this.garageReturnTo = 'menu';
+    this.showGarage();
+  }
+
+  showGarage() {
+    this.restoreStudioLighting();
+    this.gameState = 'WORKSHOP';
+    if (this.workshop) {
+      this.workshop.selectedCarId = window.SaveManager ? window.SaveManager.getSelectedCarId() : this.workshop.selectedCarId;
+      this.workshop.enterWorkshop();
+    }
+  }
+
+  hideWorkshop() {
+    const ws = document.getElementById('workshop-screen');
+    if (ws) { ws.classList.add('hidden'); ws.style.display = 'none'; }
+    if (this.workshop) {
+      if (this.workshop.previewCarModel) this.scene.remove(this.workshop.previewCarModel.group);
+      if (this.workshop.platform) this.scene.remove(this.workshop.platform);
+    }
+  }
+
+  /** Return to the main menu from any state. */
+  goToMainMenu() {
+    if (!this.mainMenu) { this.returnToWorkshop(); return; }
+    const state = this.gameState;
+    if (state === 'FREE_ROAM' || (state === 'PAUSED' && this.settingsReturnState === 'FREE_ROAM')) {
+      if (this.openWorld) this.openWorld.exit();
+    } else if (state === 'WORKSHOP') {
+      this.hideWorkshop();
+    } else if (state === 'MAP_SELECT') {
+      const ms = document.getElementById('map-select-screen');
+      if (ms) { ms.style.display = 'none'; ms.classList.add('hidden'); }
+    } else {
+      // circuit race / countdown / finished / paused-race
+      if (this.countdownInterval) { clearInterval(this.countdownInterval); this.countdownInterval = null; }
+      if (this.weather) this.weather.applyWeather('clear');
+      if (window.SoundEngine) {
+        window.SoundEngine.stopMusic();
+        if (typeof window.SoundEngine.silenceGameplayAudio === 'function') window.SoundEngine.silenceGameplayAudio();
+      }
+      this.clearScene();
+    }
+    ['hud', 'settings-modal'].forEach((id) => { const el = document.getElementById(id); if (el) el.style.display = 'none'; });
+    ['countdown-screen', 'checkpoint-missed', 'finish-modal', 'quit-confirm-modal'].forEach((id) => { const el = document.getElementById(id); if (el) { el.classList.add('hidden'); if (id === 'quit-confirm-modal') el.style.display = 'none'; } });
+    this.settingsReturnState = null;
+    this.mainMenu.showMenu();
   }
 
   // ─────────────────────────────────────────────
@@ -110,6 +221,7 @@ class GameEngine {
   // ─────────────────────────────────────────────
   openMapSelect(selectedCarId) {
     this.selectedCarId = selectedCarId;
+    if (this.openWorld) this.openWorld.detach();
     this.gameState = 'MAP_SELECT';
     this.mapSelect.enterMapSelect(selectedCarId);
   }
@@ -170,10 +282,13 @@ class GameEngine {
     // Cleanly clear active race objects & track
     this.clearScene();
 
+    this.restoreStudioLighting();
     this.workshop.enterWorkshop();
   }
 
   startRaceFromMapSelect(selectedCarId, selectedMapId, mode = 'arcade', weather = 'clear') {
+    if (this.openWorld) this.openWorld.detach();
+    if (this.mainMenu) this.mainMenu.disposeMenuTraffic();
     this.selectedCarId = selectedCarId;
     this.selectedMapId = selectedMapId;
     this.selectedMode = mode;
@@ -455,7 +570,7 @@ class GameEngine {
           this.cancelReturnToWorkshop();
         } else if (this.gameState === 'RACING') {
           this.openSettings();
-        } else if (this.gameState === 'PAUSED') {
+        } else if (this.gameState === 'PAUSED' && this.settingsReturnState !== 'FREE_ROAM') {
           this.closeSettings();
         }
       }
@@ -480,13 +595,14 @@ class GameEngine {
 
     const confirmQuitBtn = document.getElementById('btn-confirm-quit');
     if (confirmQuitBtn) {
-      confirmQuitBtn.addEventListener('click', () => this.returnToWorkshop());
+      confirmQuitBtn.addEventListener('click', () => this.goToMainMenu());
     }
 
     const camBtn = document.getElementById('btn-cam-toggle');
     if (camBtn) {
       camBtn.addEventListener('click', () => {
-        if (this.chaseCamera) this.chaseCamera.toggleView();
+        const cam = this.gameState === 'FREE_ROAM' && this.openWorld ? this.openWorld.chaseCamera : this.chaseCamera;
+        if (cam) cam.toggleView();
       });
     }
 
@@ -589,14 +705,21 @@ class GameEngine {
 
     if (settingsMainMenuBtn) {
       settingsMainMenuBtn.onclick = () => {
-        this.closeSettings();
-        this.returnToWorkshop();
+        const modal = document.getElementById('settings-modal');
+        if (modal) modal.style.display = 'none';
+        this.goToMainMenu();
       };
     }
 
     if (replayTutBtn) {
       replayTutBtn.onclick = () => {
-        this.closeSettings();
+        const back = this.settingsReturnState;
+        const modal = document.getElementById('settings-modal');
+        if (modal) modal.style.display = 'none';
+        this.settingsReturnState = null;
+        if (back === 'FREE_ROAM' && this.openWorld) this.openWorld.exit();
+        if (this.mainMenu) this.mainMenu.hideMenu();
+        this.hideWorkshop();
         this.startRaceFromMapSelect(this.selectedCarId, 'helios_rift', 'tutorial', 'clear');
       };
     }
@@ -657,6 +780,7 @@ class GameEngine {
   }
 
   openSettings() {
+    if (this.gameState !== 'PAUSED') this.settingsReturnState = this.gameState;
     this.gameState = 'PAUSED';
     const modal = document.getElementById('settings-modal');
     if (modal) modal.style.display = 'flex';
@@ -666,8 +790,11 @@ class GameEngine {
     const modal = document.getElementById('settings-modal');
     if (modal) modal.style.display = 'none';
     if (this.gameState === 'PAUSED') {
-      this.gameState = 'RACING';
+      const back = this.settingsReturnState || 'RACING';
+      this.gameState = back === 'PAUSED' ? 'RACING' : back;
+      if (back === 'FREE_ROAM' && this.openWorld && this.openWorld.active) this.openWorld.openPauseMenu();
     }
+    this.settingsReturnState = null;
   }
 
   // ─────────────────────────────────────────────
@@ -763,6 +890,7 @@ class GameEngine {
   }
 
   respawnPlayer() {
+    if (this.gameState === 'FREE_ROAM') { if (this.openWorld) this.openWorld.resetPlayer(); return; }
     if (!this.playerPhysics || !this.track) return;
     this.playerPhysics.respawnAtCheckpoint();
     this.respawnPenaltyTimer = 3.0; // 3-second penalty
@@ -1112,6 +1240,17 @@ class GameEngine {
     requestAnimationFrame(this.animate.bind(this));
 
     const dt = Math.min(this.clock.getDelta(), 0.05);
+
+    // 0. Title / Main Menu (cinematic backdrop) & Open World
+    if (this.gameState === 'TITLE' || this.gameState === 'MAIN_MENU') {
+      if (this.mainMenu) this.mainMenu.update(dt);
+      if (this.pipeline) this.pipeline.render(); else this.renderer.render(this.scene, this.camera);
+      return;
+    }
+    if (this.gameState === 'FREE_ROAM') {
+      if (this.openWorld) this.openWorld.frame(dt);
+      return;
+    }
 
     // 1. Workshop Mode
     if (this.gameState === 'WORKSHOP') {

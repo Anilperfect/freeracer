@@ -1402,9 +1402,11 @@ class CarModel {
       this.customLighting.underglowColor = options.underglowColor;
       this.underglowMat.color.set(options.underglowColor);
     }
-    if (options.nitroColor !== undefined) {
-      this.customLighting.nitroFlameColor = options.nitroColor;
-      this.flameMat.color.set(options.nitroColor);
+    // The garage/save store this as `nitroFlameColor`; accept both spellings.
+    const flame = options.nitroFlameColor !== undefined ? options.nitroFlameColor : options.nitroColor;
+    if (flame !== undefined) {
+      this.customLighting.nitroFlameColor = flame;
+      if (this.flameMat) this.flameMat.color.set(flame);
     }
   }
 
