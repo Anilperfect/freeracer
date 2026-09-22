@@ -6,7 +6,7 @@
  * cinematic backdrop for the menu.
  */
 (function () {
-  const GAME_VERSION = 'v0.2.0 — Phase 1 vertical slice';
+  const GAME_VERSION = 'v0.3.0 — Phase 2 vehicle system';
 
   class MainMenuManager {
     constructor(game) {

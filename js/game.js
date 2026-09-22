@@ -155,12 +155,14 @@ class GameEngine {
     this.chaseCamera = null;
     this.hud = null;
     const carId = opts.carId || (window.SaveManager ? window.SaveManager.getSelectedCarId() : this.selectedCarId);
-    this.selectedCarId = carId;
-    this.openWorld.enter({ carId, spawn: opts.spawn || 'last' });
+    if (!opts.testDrive) this.selectedCarId = carId;
+    this.openWorld.enter({ carId, spawn: opts.spawn || 'last', testDrive: !!opts.testDrive });
   }
 
   enterGarageFromWorld() {
+    const testDriveCar = this.openWorld && this.openWorld.testDrive ? this.openWorld.playerCarId : null;
     if (this.openWorld) this.openWorld.exit();
+    if (this.workshop && testDriveCar) this.workshop.focusCarId = testDriveCar;
     this.garageReturnTo = 'world';
     this.showGarage();
   }
@@ -489,9 +491,8 @@ class GameEngine {
     // Load saved upgrades and customizations
     if (window.SaveManager) {
       const profile = window.SaveManager.getProfile();
-      if (profile.upgrades && profile.upgrades[selectedCarId]) {
-        this.playerPhysics.applyUpgrades(profile.upgrades[selectedCarId]);
-      }
+      if (window.UpgradeSystem) this.playerPhysics.applyModifiers(window.UpgradeSystem.getModifiers(selectedCarId));
+      else if (profile.upgrades && profile.upgrades[selectedCarId]) this.playerPhysics.applyUpgrades(profile.upgrades[selectedCarId]);
       if (profile.cosmetics && profile.cosmetics[selectedCarId]) {
         this.playerCar.setCustomization(profile.cosmetics[selectedCarId]);
       }

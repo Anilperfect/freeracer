@@ -20,8 +20,22 @@ python3 -m http.server 8080      # then visit http://localhost:8080
   Route markers, gates, countdown, standings, medals, results screen.
 * **Traffic** and **AI rivals** that follow the road network.
 * **Credits + Reputation** (10 levels) → unlocks; **discovery landmarks**.
-* **Garage** — 5 cars (Kinetix, Veloce, Ordnance Hero Works), paint/finish/rims/underglow/flame,
-  7-stat upgrades — all applied in the open world.
+* **Garage** — paint/finish/rims/underglow/flame cosmetics, all applied in the open world.
+
+## New in v0.3.0 (Phase 2 — core vehicle system)
+
+* **10 cars, 8 fictional manufacturers** — Kinetix, Veloce, Ordnance Hero Works, Radian (Sprint 4 rally
+  hatch), Veyra (Corsair drift coupe), Monarch (Sovereign GT muscle), Voltrix (Ion electric), Apex Forge
+  (Halo hypercar). Every car is a data entry (`js/carData.js`, `js/carDataNeonCoast.js`) that picks a
+  procedural body style, engine audio profile and physics set.
+* **Part-based upgrades** — Engine, Drivetrain, Tyres, Brakes, Suspension, Aero, Weight, Nitro, each with
+  five named stages and honest trade-offs (aero adds drag, sticky tyres resist sliding, stripping weight
+  makes the car twitchier). Costs scale with the car's tier; no real-money anything.
+* **Tuning** — brake bias, downforce, final drive, steering and ride height sliders plus Balanced / Grip /
+  Drift / Sprint / Off-Road presets. Free to change, previewed live on the stat bars.
+* **Garage stat bars** show before/after ghosts and the PR change when you hover a part.
+* **Test drive** any locked car in Apex Downtown before buying it (events disabled during the test).
+* Old saves keep their upgrades: legacy stat levels migrate once into part stages.
 * **Circuit Events** — the original anti-gravity circuits (4 tracks, 5 modes, weather, replay) are kept
   intact and reachable from the main menu.
 * **Save v3** in localStorage with schema versioning, legacy-save migration and corrupt-data recovery.
@@ -49,6 +63,9 @@ js/game.js                 GameEngine (state machine, circuit loop, settings)
 js/mainMenu.js             title, main menu, credits
 js/openworld/              road network, district data, world builder, physics, traffic, AI,
                            events, HUD, manager (free roam)
+js/partsData.js            parts catalogue (8 categories × 5 stages), tuning sliders & presets
+js/upgradeSystem.js        UpgradeSystem: stages, costs, tuning, modifier vector, PR
+js/carDataNeonCoast.js     Phase 2 roster additions (Radian, Veyra, Monarch, Voltrix, Apex Forge)
 js/*.js                    garage, cars, audio, camera, circuit mode (track/physics/ai/…)
 tools/smoke-test.js        headless regression test (jsdom + Three.js math, stubbed WebGL)
 FREERACER_GDD.md           game design document

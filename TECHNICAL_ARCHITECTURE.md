@@ -93,7 +93,9 @@ TITLE ─► MAIN_MENU ─┬─► FREE_ROAM ◄──────────�
 | `js/game.js` | `GameEngine`: Three setup, input polling (keyboard/touch/gamepad), state machine, fixed-timestep circuit loop, settings/pause wiring, flow helpers (`enterFreeRoam`, `showGarage`, `goToMainMenu`) |
 | `js/mainMenu.js` | Title screen, main menu, driver profile card, credits, profile reset, cinematic backdrop |
 | `js/car.js` | `CarModel`: procedural PBR car meshes per `carId`, wheels, lights, exhaust flames, doors/aero animation, `setCustomization()` |
-| `js/carData.js` | `window.CarDatabase` — data-driven vehicle specs |
+| `js/carData.js` + `js/carDataNeonCoast.js` | `window.CarDatabase` — data-driven vehicle specs (10 cars). `bodyStyle` selects the procedural exterior (`hatch | track | gt | hyper`); `accentColor`, `spokeCount`, `engine.audioProfile` pick trim, rims and engine sound |
+| `js/partsData.js` | `PartsCatalog` (8 categories × 5 stages, each stage = multipliers on the modifier vector), `TuningSliders`, `TuningPresets` |
+| `js/upgradeSystem.js` | `UpgradeSystem` singleton: installed stages + tuning per car (in the save), tier-scaled costs, `getModifiers()` → one modifier vector consumed by both physics models, display stats (0–100), PR, legacy migration |
 | `js/saveManager.js` | Versioned profile v3 (credits, reputation levels, cars, upgrades, cosmetics, event records, discoveries, settings, last position). Migrates legacy `turbo_rush_save_v2`; backs up and resets corrupt data |
 | `js/audio.js` | `SoundEngine` procedural audio + music layers + announcer |
 | `js/camera.js` | `ChaseCamera` (CHASE / COCKPIT / CINEMATIC); `OpenWorldCamera` in the manager extends it with building-aware placement |
@@ -127,8 +129,14 @@ TITLE ─► MAIN_MENU ─┬─► FREE_ROAM ◄──────────�
 
 * **Vehicles** — `js/carData.js` (`CarDatabase`). Open-world handling reads `physics.*` plus
   `dimensions.curbWeightKg`, `engine.peakPowerKw`, `engine.drivetrain` when present.
-* **Upgrades** — `SaveManager.UPGRADE_COSTS` + per-car level map; effects in
-  `applyUpgrades()` of each controller (circuit and free-body).
+* **Parts & tuning** — `js/partsData.js`. A stage is `{ name, effects }` where `effects` multiplies entries of the
+  modifier vector `{ power, topSpeed, grip, brake, handling, stability, mass, drag, driftability, rough,
+  nitroCapacity, nitroEfficiency, nitroPower }` (all 1.0 = stock). `UpgradeSystem.getModifiers(carId)` folds
+  the installed stages and the tuning sliders into one vector; `FreeVehiclePhysics.applyModifiers()` and
+  `ArcadeCarPhysics.applyModifiers()` map it onto their own parameters (mass/Iz, acceleration, maxSpeed, cdA,
+  brake, tyre μ, steer response, drift multiplier, off-road grip scale, nitro tank/burn/power).
+  Cost = `stageBaseCost[stage] × category.costWeight × tierFactor(car.price)`. Legacy `applyUpgrades()` paths
+  remain as a fallback when `UpgradeSystem` is absent.
 * **Districts** — `js/openworld/districts/*.js` each export a definition:
   `{ id, name, bounds, nodes, edges, plaza, waterfront, garage, spawn, discoveries }`.
 * **Events** — `js/openworld/districts/<district>Events.js`: id, name, type (`sprint | circuit | timetrial`),
@@ -146,7 +154,9 @@ Key `freeracer_save_v3` (legacy `turbo_rush_save_v2` is migrated on first load; 
   schemaVersion: 3, userId, createdAt, updatedAt,
   cash, totalEarnings, totalSpent, selectedCarId, unlockedCars[], unlockedTracks[], tutorialCompleted,
   bestTimes{}, ghostLaps{},                                   // circuit mode
-  upgrades{carId→{stat→level}}, cosmetics{carId→{…}},
+  upgrades{carId→{stat→level}} (legacy, migrated once), cosmetics{carId→{…}},
+  parts{carId→{engine,drivetrain,tires,brakes,suspension,aero,weight,nitro: 0–5}},
+  tuning{carId→{brakeBias,downforce,finalDrive,steering,rideHeight: −1..1}}, partsMigrated,
   progress: { reputation, eventRecords{eventId→{bestTime,bestPosition,medal,plays,wins,lastPlayed}},
               discoveries[], distanceKm, driftPoints, eventsPlayed, eventsWon, playtimeSec,
               assistLevel, lastDistrict, lastPosition{x,z,yaw}, introSeen },
