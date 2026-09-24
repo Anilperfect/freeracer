@@ -64,6 +64,18 @@ python3 -m http.server 8080      # then visit http://localhost:8080
   high-contrast HUD.
 * **Auto graphics quality** for free roam (dynamic resolution/shadow stepping) alongside the fixed presets.
 
+## New in v0.7.0 (Neon Auto Exchange — shop, buy & sell)
+
+* **Neon Auto Exchange** — a full shop reachable from the main menu (SHOP, key `S`) and from the
+  pause menu in free roam. Live cash and REP readout, two tabs (keys `1`/`2`), Esc to leave.
+* **Buy & sell cars** — every car card shows class, manufacturer, live stat bars (upgrades included)
+  and price. Selling returns **60% of the sticker price plus 50% of the parts value** invested in the
+  car. Starter-grant cars, the car you're currently driving and your last remaining car can't be sold.
+* **Buy & refund part stages** — all 8 categories × 5 stages with the same per-tier pricing as the
+  workshop, an effect preview of the next stage, and one-step **refunds at 50%** of the stage cost.
+* New APIs: `SaveManager.removeCar` (safe, starter cars protected) and
+  `UpgradeSystem.uninstall` / `getUninstallRefund` (50% stage refunds).
+
 ## Controls
 
 | Action | Keyboard | Gamepad |
