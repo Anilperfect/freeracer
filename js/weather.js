@@ -173,6 +173,41 @@ class WeatherManager {
     }
   }
 
+  /**
+   * District-friendly weather for free roam: particles + fog only, never
+   * touches the district lighting profile (unlike applyWeather, which is
+   * tuned for circuit mode and would reset the dusk look).
+   * @param {'clear'|'rain'|'fog'} kind
+   * @param {{color:number, density:number}|null} fogBase district fog to restore
+   */
+  applyAmbientWeather(kind, fogBase) {
+    if (kind !== 'rain' && kind !== 'fog') kind = 'clear';
+    this.currentWeather = kind;
+    // Cleanup old particles
+    if (this.particleSystem) {
+      this.weatherGroup.remove(this.particleSystem);
+      if (this.particleSystem.geometry) this.particleSystem.geometry.dispose();
+      if (this.particleSystem.material) this.particleSystem.material.dispose();
+      this.particleSystem = null;
+      this.particlePositions = null;
+      this.particleVelocities = null;
+    }
+    if (kind === 'rain') this._createWeatherParticles('rain', Math.floor(1800 * this.qualityMultiplier));
+    else if (kind === 'fog') this._createWeatherParticles('mist', Math.floor(800 * this.qualityMultiplier));
+    if (this.scene.fog && fogBase) {
+      if (kind === 'fog') {
+        this.scene.fog.color.setHex(0x3a3f5c);
+        this.scene.fog.density = fogBase.density * 2.2;
+      } else if (kind === 'rain') {
+        this.scene.fog.color.setHex(fogBase.color);
+        this.scene.fog.density = fogBase.density * 1.35;
+      } else {
+        this.scene.fog.color.setHex(fogBase.color);
+        this.scene.fog.density = fogBase.density;
+      }
+    }
+  }
+
   _createWeatherParticles(type, count) {
     const geo = new THREE.BufferGeometry();
     const positions = new Float32Array(count * 3);

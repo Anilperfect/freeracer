@@ -146,6 +146,7 @@
         }
         this.events.push({
           def, id: def.id, name: def.name, type: def.type, laps, route, checkpoints, totalLength, medalTimes,
+          driftTargets: def.driftTargets || null,
           marker: { x: startPt.x, z: startPt.z, dx: startPt.dx / startLen, dz: startPt.dz / startLen, radius: 8.5 },
           follower
         });
@@ -205,6 +206,7 @@
       if (ev.type === 'sprint') return `Sprint · ${km} km · ${ev.def.opponents} rivals`;
       if (ev.type === 'circuit') return `Circuit · ${ev.laps} laps · ${km} km`;
       if (ev.type === 'timetrial') return `Time Attack · ${km} km · solo`;
+      if (ev.type === 'drift') return `Drift · ${km} km · target ${(ev.driftTargets && ev.driftTargets.gold) || 1000} pts`;
       return ev.type;
     }
 
@@ -263,17 +265,19 @@
       this.playerFollower.track(pp.x, pp.z, 200, 200);
       if (this.m.traffic) this.m.traffic.clearArea(pp.x, pp.z, 110);
 
-      // rivals
+      // rivals (crew roster when the event declares a crew, else the classic pool)
       this.rivals = [];
       const cars = ev.def.rivalCars || ['veloce_v10_corsa', 'veloce_v8_gt', 'veloce_v12_stradale'];
       const names = ['Nova Reyes', 'Kade Marlow', 'Ines Vidal', 'Rook Tanaka', 'Sable Cruz'];
       const colors = [0x1a56e6, 0xd4af37, 0xe61a2b, 0x22c55e, 0xa855f7];
+      const roster = window.getRivalsForEvent ? window.getRivalsForEvent(ev.def, ev.def.opponents) : null;
       for (let i = 0; i < ev.def.opponents; i++) {
+        const r = roster ? roster[i] : null;
         const ai = new window.OpenWorldAIRacer({
-          name: names[i % names.length],
-          carId: cars[i % cars.length],
+          name: r ? r.name : names[i % names.length],
+          carId: r ? r.carId : cars[i % cars.length],
           color: colors[i % colors.length],
-          skill: THREE.MathUtils.clamp((ev.def.aiSkill || 0.8) + (i - 1) * 0.04, 0.55, 0.98),
+          skill: r ? r.skill : THREE.MathUtils.clamp((ev.def.aiSkill || 0.8) + (i - 1) * 0.04, 0.55, 0.98),
           world: this.m.worldQuery,
           route: ev.route,
           laps: ev.laps,
@@ -487,10 +491,18 @@
       const finalPos = all.findIndex((r) => r.isPlayer) + 1;
 
       // medal + rewards
+      const medalPos = { gold: 1, silver: 2, bronze: 3, none: 4 };
       let medal = 'none';
       let credits = 0; let rep = 0;
       const rw = ev.def.rewards || {};
-      if (ev.type === 'timetrial') {
+      let driftScore = 0;
+      if (ev.type === 'drift') {
+        driftScore = Math.round(Math.max(0, (this.player.driftScore || 0) - this.driftAtStart));
+        const t = ev.driftTargets || { gold: 1000, silver: 600, bronze: 300 };
+        medal = driftScore >= t.gold ? 'gold' : (driftScore >= t.silver ? 'silver' : (driftScore >= t.bronze ? 'bronze' : 'none'));
+        credits = (rw.credits && rw.credits[medal]) || 0;
+        rep = (rw.reputation && rw.reputation[medal]) || 0;
+      } else if (ev.type === 'timetrial') {
         const mt = ev.medalTimes;
         medal = time <= mt.gold ? 'gold' : (time <= mt.silver ? 'silver' : (time <= mt.bronze ? 'bronze' : 'none'));
         credits = (rw.credits && rw.credits[medal]) || 0;
@@ -500,23 +512,42 @@
         credits = (rw.credits && rw.credits[Math.min(finalPos, rw.credits.length) - 1]) || 0;
         rep = (rw.reputation && rw.reputation[Math.min(finalPos, rw.reputation.length) - 1]) || 0;
       }
-      const driftBonus = Math.min(500, Math.round(Math.max(0, (this.player.driftScore || 0) - this.driftAtStart) * 0.5));
+      const driftBonus = ev.type === 'drift' ? 0 : Math.min(500, Math.round(Math.max(0, (this.player.driftScore || 0) - this.driftAtStart) * 0.5));
+      const finalPosition = ev.type === 'drift' ? medalPos[medal] : finalPos;
       const prevRecord = window.SaveManager ? window.SaveManager.getEventRecord(ev.id) : null;
       const replay = !!prevRecord;
       if (replay) { credits = Math.round(credits * 0.5); rep = Math.round(rep * 0.5); }
       let saveInfo = { newBest: false, firstClear: !prevRecord };
       let levelInfo = null;
       if (window.SaveManager) {
-        saveInfo = window.SaveManager.recordEventResult(ev.id, { time, position: finalPos, medal });
+        saveInfo = window.SaveManager.recordEventResult(ev.id, { time, position: finalPosition, medal });
         if (saveInfo.newBest && replay) rep += 100;
         window.SaveManager.addCash(credits + driftBonus);
         levelInfo = window.SaveManager.addReputation(rep);
         window.SaveManager.addStat('driftPoints', Math.round(Math.max(0, (this.player.driftScore || 0) - this.driftAtStart)));
       }
+      // championships (solo medals map to positions for series scoring)
+      const champUpdates = [];
+      if (window.SaveManager && window.getChampionshipsForEvent) {
+        window.getChampionshipsForEvent(ev.id).forEach((champ) => {
+          if (window.SaveManager.getReputation() < (champ.unlockRep || 0)) return;
+          const res = window.SaveManager.recordChampionshipResult(champ, ev.id, finalPosition);
+          champUpdates.push({ id: champ.id, name: champ.name, ...res });
+          if (res.firstCompletion) {
+            window.SaveManager.addCash(champ.championBonus.credits);
+            levelInfo = window.SaveManager.addReputation(champ.championBonus.rep);
+            this.m.toast(`🏆 ${champ.name} complete! +₡${champ.championBonus.credits.toLocaleString()} +${champ.championBonus.rep} REP`, 'level', 6);
+            if (res.isChampion) this.m.toast(`CHAMPION — you won every round of the ${champ.name}!`, 'level', 6);
+          } else {
+            this.m.toast(`${champ.name}: P${finalPosition} (+${res.roundPoints} pts, ${res.points} total)`, 'info', 3);
+          }
+        });
+      }
       this.lastResult = {
         event: ev, position: finalPos, time, medal, credits, driftBonus, rep, standings: all,
         newBest: saveInfo.newBest, firstClear: saveInfo.firstClear, replay, levelInfo,
-        medalTimes: ev.medalTimes
+        medalTimes: ev.medalTimes, driftScore, driftTargets: ev.driftTargets || null,
+        championships: champUpdates
       };
       this.state = 'results';
       if (window.SoundEngine) {
@@ -569,6 +600,8 @@
         wrongWay: this.wrongWay,
         offRoute: this.offRouteTimer > 3,
         medalTimes: ev.medalTimes,
+        driftScore: ev.type === 'drift' ? Math.max(0, (this.player.driftScore || 0) - (this.driftAtStart || 0)) : 0,
+        driftTargets: ev.driftTargets || null,
         route: ev.route,
         rivals: this.rivals
       };

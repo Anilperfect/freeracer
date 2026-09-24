@@ -335,6 +335,7 @@
     <div class="ow-prompt hidden" id="ow-prompt"><span class="ow-key" id="ow-prompt-key">E</span><div><div class="ow-prompt-text" id="ow-prompt-text">Start event</div><div class="ow-prompt-sub" id="ow-prompt-sub"></div></div></div>
     <div class="ow-toasts" id="ow-toasts"></div>
     <div class="ow-fps" id="ow-fps"></div>
+    <div class="ow-subtitles hidden" id="ow-subtitles"></div>
     <button class="hud-btn ow-pause-btn" id="btn-ow-hud-pause" title="Pause (Esc)">⏸</button>
   </div>
 
@@ -367,8 +368,14 @@
             <option value="heavy">Heavy</option>
           </select>
         </label>
+        <label class="ow-travel-label">District fast travel
+          <span class="ow-travel-row">
+            <select id="ow-district-select"></select>
+            <button class="ws-btn primary" id="btn-ow-travel">GO</button>
+          </span>
+        </label>
       </div>
-      <div class="ow-menu-controls">W/↑ gas · S/↓ brake · A/D steer · Space handbrake · Shift nitro · E interact · R reset · C camera · M map · N minimap rotation · Esc pause</div>
+      <div class="ow-menu-controls">W/↑ gas · S/↓ brake · A/D steer · Space handbrake · Shift nitro · E interact · R reset · C camera · M map · N minimap rotation · 1-4 map filters · Esc pause</div>
     </div>
   </div>
 
@@ -415,6 +422,7 @@
           <option value="medium">Medium</option>
           <option value="high" selected>High (Recommended)</option>
           <option value="ultra">Ultra (Max FX)</option>
+          <option value="auto">Auto (free roam)</option>
         </select>
       </div>
 
@@ -439,6 +447,70 @@
         </label>
       </div>
 
+      <div class="settings-section">OPEN WORLD</div>
+
+      <div class="settings-row">
+        <label>Day / night cycle</label>
+        <label class="settings-toggle">
+          <input type="checkbox" id="settings-daynight" checked>
+          <span>Enabled</span>
+        </label>
+      </div>
+
+      <div class="settings-row">
+        <label>Free-roam weather</label>
+        <label class="settings-toggle">
+          <input type="checkbox" id="settings-weather" checked>
+          <span>Enabled</span>
+        </label>
+      </div>
+
+      <div class="settings-section">ACCESSIBILITY</div>
+
+      <div class="settings-row">
+        <label>Color-blind mode</label>
+        <select id="settings-colorblind">
+          <option value="none">Off</option>
+          <option value="deuteranopia">Deuteranopia</option>
+          <option value="protanopia">Protanopia</option>
+          <option value="tritanopia">Tritanopia</option>
+        </select>
+      </div>
+
+      <div class="settings-row">
+        <label>HUD text size</label>
+        <select id="settings-textscale">
+          <option value="0.9">Small</option>
+          <option value="1" selected>Normal</option>
+          <option value="1.15">Large</option>
+          <option value="1.3">Extra large</option>
+        </select>
+      </div>
+
+      <div class="settings-row">
+        <label>Reduce motion</label>
+        <label class="settings-toggle">
+          <input type="checkbox" id="settings-reduce-motion">
+          <span>Enabled</span>
+        </label>
+      </div>
+
+      <div class="settings-row">
+        <label>Announcer subtitles</label>
+        <label class="settings-toggle">
+          <input type="checkbox" id="settings-subtitles" checked>
+          <span>Enabled</span>
+        </label>
+      </div>
+
+      <div class="settings-row">
+        <label>High-contrast HUD</label>
+        <label class="settings-toggle">
+          <input type="checkbox" id="settings-hc-hud">
+          <span>Enabled</span>
+        </label>
+      </div>
+
       <div class="settings-row">
         <label>Master Volume</label>
         <input type="range" id="settings-vol-master" min="0" max="1" value="1.0" step="0.05">
@@ -457,6 +529,14 @@
       <div class="settings-row">
         <label>Announcer Voice</label>
         <input type="range" id="settings-vol-voice" min="0" max="1" value="0.9" step="0.05">
+      </div>
+
+      <div class="settings-section">CONTROLS — CLICK A KEY TO REBIND</div>
+      <div id="settings-controls-list"></div>
+      <div class="settings-controls-note" id="settings-controls-note"></div>
+      <div class="settings-row">
+        <label>Custom bindings</label>
+        <button class="ws-btn" id="btn-reset-controls">Reset to defaults</button>
       </div>
 
       <div style="display: flex; gap: 12px; margin-top: 14px; flex-wrap: wrap;">
@@ -538,6 +618,8 @@
 
   <!-- FreeRacer subsystems in dependency order (circuit heritage modules first) -->
   <script src="js/saveManager.js"></script>
+  <script src="js/controls.js"></script>
+  <script src="js/accessibility.js"></script>
   <script src="js/audio.js"></script>
   <script src="js/track.js"></script>
   <script src="js/car.js"></script>
@@ -545,6 +627,7 @@
   <script src="js/carDataNeonCoast.js"></script>
   <script src="js/partsData.js"></script>
   <script src="js/upgradeSystem.js"></script>
+  <script src="js/crewsData.js"></script>
   <!-- Bujji Hero Car Assets -->
   <script src="assets/vehicles/bujji/bujjiTextures.js"></script>
   <script src="assets/vehicles/bujji/bujjiAudio.js"></script>
@@ -578,6 +661,11 @@
   <script src="js/openworld/collisionGrid.js"></script>
   <script src="js/openworld/districts/apexDowntown.js"></script>
   <script src="js/openworld/districts/apexDowntownEvents.js"></script>
+  <script src="js/openworld/districts/harborline.js"></script>
+  <script src="js/openworld/districts/harborlineEvents.js"></script>
+  <script src="js/openworld/districts/sunspireCoast.js"></script>
+  <script src="js/openworld/districts/sunspireCoastEvents.js"></script>
+  <script src="js/openworld/districts/registry.js"></script>
   <script src="js/openworld/worldBuilder.js"></script>
   <script src="js/openworld/freeVehiclePhysics.js"></script>
   <script src="js/openworld/trafficSystem.js"></script>

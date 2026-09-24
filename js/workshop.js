@@ -681,6 +681,10 @@ class WorkshopManager {
       underglowColor: '#00d8ff',
       nitroFlameColor: '#00f0ff'
     };
+    if (currentCosmetics.secondaryColor === undefined) currentCosmetics.secondaryColor = '#111317';
+    if (currentCosmetics.caliperColor === undefined) currentCosmetics.caliperColor = '#ff1e38';
+    if (currentCosmetics.spoiler === undefined) currentCosmetics.spoiler = 'none';
+    if (currentCosmetics.windowTint === undefined) currentCosmetics.windowTint = 0;
 
     // 1. Paint Swatches
     const swatchContainer = document.getElementById('ws-paint-swatches');
@@ -785,6 +789,80 @@ class WorkshopManager {
           this.buildCosmeticOptions();
         });
       });
+    }
+
+    // 6. Secondary Trim Swatches
+    const secondaryContainer = document.getElementById('ws-secondary-swatches');
+    if (secondaryContainer) {
+      const trims = ['#111317', '#e8eef5', '#e61a2b', '#00d8ff', '#ffaa00', '#7700ff', '#00ff88'];
+      secondaryContainer.innerHTML = trims.map(c => `
+        <div class="ws-secondary-dot" data-trim="${c}" style="width: 22px; height: 22px; border-radius: 50%; background: ${c}; cursor: pointer; border: 2px solid ${currentCosmetics.secondaryColor === c ? '#fff' : 'transparent'};"></div>
+      `).join('');
+
+      secondaryContainer.querySelectorAll('.ws-secondary-dot').forEach(dot => {
+        dot.addEventListener('click', (e) => {
+          const col = e.currentTarget.getAttribute('data-trim');
+          currentCosmetics.secondaryColor = col;
+          if (window.SaveManager) window.SaveManager.setCosmetics(car.id, { secondaryColor: col });
+          if (this.previewCarModel) this.previewCarModel.setCustomization({ secondaryColor: col });
+          this.buildCosmeticOptions();
+        });
+      });
+    }
+
+    // 7. Brake Caliper Swatches
+    const caliperContainer = document.getElementById('ws-caliper-swatches');
+    if (caliperContainer) {
+      const calipers = ['#ff1e38', '#ffaa00', '#00d8ff', '#00ff88', '#e8eef5', '#111317'];
+      caliperContainer.innerHTML = calipers.map(c => `
+        <div class="ws-caliper-dot" data-caliper="${c}" style="width: 22px; height: 22px; border-radius: 50%; background: ${c}; cursor: pointer; border: 2px solid ${currentCosmetics.caliperColor === c ? '#fff' : 'transparent'};"></div>
+      `).join('');
+
+      caliperContainer.querySelectorAll('.ws-caliper-dot').forEach(dot => {
+        dot.addEventListener('click', (e) => {
+          const col = e.currentTarget.getAttribute('data-caliper');
+          currentCosmetics.caliperColor = col;
+          if (window.SaveManager) window.SaveManager.setCosmetics(car.id, { caliperColor: col });
+          if (this.previewCarModel) this.previewCarModel.setCustomization({ caliperColor: col });
+          this.buildCosmeticOptions();
+        });
+      });
+    }
+
+    // 8. Bolt-on Spoiler
+    const spoilerContainer = document.getElementById('ws-spoiler-options');
+    if (spoilerContainer) {
+      const spoilers = [['none', 'NONE'], ['sport', 'SPORT'], ['gt', 'GT WING']];
+      spoilerContainer.innerHTML = spoilers.map(([id, label]) => `
+        <button class="ws-spoiler-btn" data-spoiler="${id}" style="flex: 1; padding: 4px 6px; font-size: 10px; font-family: 'Orbitron', sans-serif; background: ${currentCosmetics.spoiler === id ? '#00d8ff' : 'rgba(255,255,255,0.1)'}; color: ${currentCosmetics.spoiler === id ? '#0a0e17' : '#fff'}; border: none; border-radius: 3px; cursor: pointer;">${label}</button>
+      `).join('');
+
+      spoilerContainer.querySelectorAll('.ws-spoiler-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          const sp = e.currentTarget.getAttribute('data-spoiler');
+          currentCosmetics.spoiler = sp;
+          if (window.SaveManager) window.SaveManager.setCosmetics(car.id, { spoiler: sp });
+          if (this.previewCarModel) this.previewCarModel.setCustomization({ spoiler: sp });
+          this.buildCosmeticOptions();
+        });
+      });
+    }
+
+    // 9. Window Tint
+    const tintRange = document.getElementById('ws-tint-range');
+    const tintValue = document.getElementById('ws-tint-value');
+    if (tintRange) {
+      tintRange.value = String(Math.round(Number(currentCosmetics.windowTint || 0) * 100));
+      if (tintValue) tintValue.textContent = `${tintRange.value}%`;
+      tintRange.oninput = () => {
+        const v = Number(tintRange.value) / 100;
+        if (tintValue) tintValue.textContent = `${tintRange.value}%`;
+        currentCosmetics.windowTint = v;
+        if (this.previewCarModel) this.previewCarModel.setCustomization({ windowTint: v });
+      };
+      tintRange.onchange = () => {
+        if (window.SaveManager) window.SaveManager.setCosmetics(car.id, { windowTint: Number(tintRange.value) / 100 });
+      };
     }
   }
 

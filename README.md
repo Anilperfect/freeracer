@@ -40,6 +40,30 @@ python3 -m http.server 8080      # then visit http://localhost:8080
   intact and reachable from the main menu.
 * **Save v3** in localStorage with schema versioning, legacy-save migration and corrupt-data recovery.
 
+## New in v0.6.1 (Neon Coast complete — districts, crews, polish)
+
+* **3 districts, 12 events, 20 discoveries** — Apex Downtown plus **Harborline** (industrial docks,
+  container yards, 5×5 grid, unlocks at 1500 REP) and **Sunspire Coast** (beachfront avenues, sand
+  driving surface, 6×6 grid, unlocks at 3500 REP). Each district has its own garage, events, caches,
+  climate and visual theme; the pause menu shows live district/event/discovery totals.
+* **Fast travel** between district garages from the pause menu (locked until the REP requirement is met).
+* **Rival crews** — Harbor Kings, Redline Syndicate, Iron District, Neon Circuit: crewed events field
+  named rivals with their own cars and skill.
+* **Drift events** with target scores (gold/silver/bronze), live drift HUD and drift-tuned results screen.
+* **Championships** — Neon Coast Cup, Harbor Kings Showdown, Sunspire Sunset Series: round points, best
+  positions kept across replays, completion bonuses.
+* **Neon caches** — 16 hidden collectibles worth credits + REP, shown on the minimap.
+* **Day/night cycle + free-roam weather** — 8-minute days with a deep-night peak, per-district climate
+  (clear/fog/rain), rain that wets the road surface. Both can be toggled in Settings.
+* **Map filters** — keys 1–4 toggle event/garage/discovery/cache markers; minimap legend on the big map.
+* **Ironclad Ridgeback truck** (11th car) + extended cosmetics: secondary paint, brake calipers, bolt-on
+  spoilers, window tint — all in the garage and applied in the open world.
+* **Remappable keyboard controls** — click any binding in Settings to rebind it; gamepad menu navigation
+  (D-pad + A) in the pause menu.
+* **Accessibility** — color-blind event palettes, HUD text size, reduce-motion mode, announcer subtitles,
+  high-contrast HUD.
+* **Auto graphics quality** for free roam (dynamic resolution/shadow stepping) alongside the fixed presets.
+
 ## Controls
 
 | Action | Keyboard | Gamepad |
@@ -52,6 +76,9 @@ python3 -m http.server 8080      # then visit http://localhost:8080
 | Reset to road | R | Back |
 | Camera | C | D-pad ↑ |
 | Full map / minimap rotation | M / N | D-pad ↓ / — |
+| Map marker filters (events/garage/discoveries/caches) | 1–4 | — |
+
+*Keyboard bindings are remappable in Settings → Controls.*
 | Pause | Esc | Start |
 
 ## Project layout

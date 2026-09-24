@@ -422,6 +422,110 @@ const waitFor = async (pred, ms = 8000) => { const t0 = Date.now(); while (!pred
     await frames(10);
   }
 
+  // ── D3. Phase 3+: districts, drift, championships, caches, settings ──────
+  {
+    const SM = window.SaveManager; const R = window.DistrictRegistry;
+    const totals = R.totals();
+    report('Registry: 3 districts, 12 events, 20 discoveries', !!R && totals.districts === 3 && totals.events === 12 && totals.discoveries === 20, JSON.stringify(totals));
+    const rep0 = SM.getReputation();
+    report('Harborline locked below 1500 REP', R.isUnlocked('apex_downtown') && !R.isUnlocked('harborline') && !R.isUnlocked('sunspire_coast'), `rep=${rep0}`);
+    SM.addReputation(Math.max(0, 1600 - rep0));
+    report('1500 REP unlocks Harborline only', R.isUnlocked('harborline') && !R.isUnlocked('sunspire_coast'), `rep=${SM.getReputation()}`);
+    SM.addReputation(Math.max(0, 3600 - SM.getReputation()));
+    report('3500 REP unlocks Sunspire Coast', R.unlocked().length === 3, R.unlocked().map((e) => e.id).join(','));
+
+    click('btn-mm-drive'); await sleep(30);
+    report('DRIVE after unlocks', Game.gameState === 'FREE_ROAM' && ow.active, `district=${ow.districtId}`);
+    key('Escape'); await sleep(5);
+    const sel = doc.getElementById('ow-district-select');
+    report('Pause travel dropdown lists 3 districts', !!sel && sel.options.length === 3, sel ? `${sel.options.length} options` : 'missing');
+    report('Pause stats show district totals', /3 districts/.test(doc.getElementById('ow-pause-stats').textContent), doc.getElementById('ow-pause-stats').textContent);
+    sel.value = 'harborline';
+    click('btn-ow-travel'); await sleep(30);
+    if (ow.paused) { key('Escape'); await sleep(5); }
+    report('Fast travel → Harborline rebuilt at garage', ow.districtId === 'harborline' && ow.world.stats.buildings > 50 && !ow.paused && Math.hypot(ow.player.position.x - ow.district.garage.spawn.x, ow.player.position.z - ow.district.garage.spawn.z) < 6, `${ow.world.stats.buildings} buildings`);
+    key('KeyW', true);
+    let d3nan = 0;
+    await frames(60, () => { if (![ow.player.position.x, ow.player.position.z, ow.player.yaw].every(Number.isFinite)) d3nan++; });
+    key('KeyW', false);
+    report('Harborline: no NaN over 60 frames', d3nan === 0);
+
+    // neon cache pickup
+    const cache = ow.district.caches.find((c) => !SM.hasCache(c.id));
+    const cash0 = SM.getCash();
+    ow.player.teleport(cache.x + 3, cache.z, 0);
+    await waitFor(() => SM.hasCache(cache.id), 1500);
+    report('Neon cache collected (+credits)', SM.hasCache(cache.id) && SM.getCash() > cash0, `${cache.name} ₡${cash0}→${SM.getCash()}`);
+
+    // sunspire: sand surface + drift event
+    ow.switchDistrict('sunspire_coast', 'garage'); await sleep(30);
+    report('Fast travel → Sunspire Coast', ow.districtId === 'sunspire_coast' && ow.world.stats.buildings > 50, `${ow.world.stats.buildings} buildings`);
+    report('Beach strip reads as sand', ow.world.surfaceAt(0, 430) === 'sand' && ow.world.surfaceAt(0, 350) !== 'sand', `430→${ow.world.surfaceAt(0, 430)} 350→${ow.world.surfaceAt(0, 350)}`);
+    SM.addReputation(Math.max(0, 4600 - SM.getReputation()));
+    ow.events.refreshMarkerLocks();
+    const dev = ow.events.events.find((e) => ((e.def || e).type === 'drift') && e.unlocked);
+    report('Drift event unlocked with gold target', !!dev && (dev.def || dev).driftTargets.gold === 1500, dev ? dev.id : 'none');
+    ow.player.teleport(dev.marker.x - dev.marker.dx * 2, dev.marker.z - dev.marker.dz * 2, Math.atan2(dev.marker.dx, dev.marker.dz));
+    await frames(10);
+    report('Drift prompt shows target score', visible('ow-prompt') && /1,?500/.test(doc.getElementById('ow-prompt-sub').textContent), `"${doc.getElementById('ow-prompt-sub').textContent}"`);
+    key('KeyE'); await sleep(10);
+    report('E starts drift countdown', ow.events.state === 'countdown', `state=${ow.events.state}`);
+    await waitFor(() => ow.events.state === 'running', 6000);
+    const dhs = ow.events.getHudState();
+    report('Drift HUD state exposes score + targets', !!dhs && dhs.type === 'drift' && typeof dhs.driftScore === 'number' && dhs.driftTargets.gold === 1500, dhs ? `score=${dhs.driftScore}` : 'none');
+    key('Escape'); await sleep(5);
+    click('btn-ow-quit-event'); await sleep(10);
+    report('Abandon drift → back to free roam', ow.events.state === 'idle' && !ow.paused, `state=${ow.events.state}`);
+
+    // championships (Neon Coast Cup: P1 + P2 + P1 = 27 pts)
+    const champs = window.getChampionshipsForEvent('apex_plaza_sprint');
+    report('Neon Coast Cup includes plaza sprint', champs.length === 1 && champs[0].id === 'neon_coast_cup');
+    const cup = window.getChampionshipById('neon_coast_cup');
+    SM.recordChampionshipResult(cup, 'apex_plaza_sprint', 1);
+    SM.recordChampionshipResult(cup, 'apex_harbor_run', 2);
+    const cupFinal = SM.recordChampionshipResult(cup, 'apex_plaza_circuit', 1);
+    report('Championship completes with best-position points', cupFinal.completed === true && cupFinal.points === 27 && cupFinal.firstCompletion === true, `${cupFinal.points} pts`);
+
+    // map filter hotkeys
+    key('Digit1'); await frames(3);
+    const fOff = ow.hud.filters.events === false;
+    key('Digit1'); await frames(3);
+    report('Digit1 toggles event markers', fOff && ow.hud.filters.events === true);
+
+    // day/night + weather
+    ow.timeOfDay = 1.5; ow.applyTimeOfDay(); await frames(2);
+    report('Night lighting applies (night peak + clock)', ow.nightFactor(1.5) > 0.9 && ow.nightFactor(12) < 0.2 && ow.clockString() === '01:30', `clock=${ow.clockString()} night=${ow._nightFactor.toFixed(2)}`);
+    ow.rollFreeRoamWeather(true);
+    report('Weather roll yields a valid state', ['clear', 'fog', 'rain'].includes(ow._weatherKind), ow._weatherKind);
+
+    // remappable controls
+    const C = window.FreeRacerControls;
+    const conflict = C.rebind('accelerate', 'KeyT', 0);
+    const rebound = C.matches('accelerate', 'KeyT');
+    C.reset();
+    report('Rebind + reset round-trips', rebound && conflict.ok && C.matches('accelerate', 'KeyW') && !C.matches('accelerate', 'KeyT'));
+
+    // accessibility
+    const A = window.Accessibility;
+    A.set('colorblind', 'deuteranopia'); A.set('textScale', 1.3); A.set('reduceMotion', true); A.set('subtitles', true);
+    const sh0 = ow.chaseCamera.shakeIntensity;
+    ow.chaseCamera.addShake(1);
+    A.subtitle('D3 test caption');
+    report('Accessibility applies (palette, text, motion, captions)', window.EventSystem.COLORS.marker === 0x00bfff && doc.documentElement.style.fontSize === '20.8px' && doc.body.classList.contains('fr-reduce-motion') && ow.chaseCamera.shakeIntensity === sh0 && doc.getElementById('ow-subtitles').textContent === 'D3 test caption', `shake ${sh0}→${ow.chaseCamera.shakeIntensity}`);
+    A.set('colorblind', 'none'); A.set('textScale', 1); A.set('reduceMotion', false);
+
+    // truck roster entry
+    const truck = window.getCarById('ironclad_ridgeback');
+    let truckBuilt = false;
+    try { const tm = new window.CarModel(truck.colorHex, false, truck.id, 0); truckBuilt = !!tm.group; tm.group.traverse((o) => { if (o.geometry) o.geometry.dispose(); }); } catch (e) { errors.push('truck build threw: ' + e.message); }
+    report('Ironclad Ridgeback truck builds', !!truck && truck.bodyStyle === 'truck' && truckBuilt, truck ? `${truck.name} ${truck.engine.drivetrain}` : 'missing');
+
+    key('Escape'); await sleep(5);
+    click('btn-ow-main-menu'); await sleep(30);
+    report('D3 → MAIN MENU', Game.gameState === 'MAIN_MENU' && !ow.active, `state=${Game.gameState}`);
+    await frames(10);
+  }
+
   // ── E. Circuit events (legacy flow) ─────────────────────────────────────
   click('btn-mm-circuits'); await sleep(30);
   report('Menu → circuit map select', Game.gameState === 'MAP_SELECT' && visible('map-select-screen'), `state=${Game.gameState}`);

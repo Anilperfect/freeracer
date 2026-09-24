@@ -29,6 +29,7 @@
     plaza: 0.95,
     sidewalk: 0.86,
     boardwalk: 0.80,
+    sand: 0.72,
     offroad: 0.55,
     ramp: 1.0
   };
@@ -327,7 +328,7 @@
       // 1. Longitudinal acceleration demand -------------------------------
       let aLong = 0;
       const dragDecel = 0.5 * 1.225 * this.cdA * vx * vx / m;
-      const rollDecel = (this.surfaceType === 'offroad' ? 2.8 : (this.surfaceType === 'sidewalk' || this.surfaceType === 'boardwalk' ? 1.8 : 0.9));
+      const rollDecel = (this.surfaceType === 'offroad' ? 2.8 : (this.surfaceType === 'sand' ? 2.2 : (this.surfaceType === 'sidewalk' || this.surfaceType === 'boardwalk' ? 1.8 : 0.9)));
       const reversing = vx < -0.3;
 
       let driveDemand = 0;

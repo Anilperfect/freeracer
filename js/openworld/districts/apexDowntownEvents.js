@@ -30,6 +30,7 @@
       name: 'Harbor Run',
       type: 'sprint',
       tier: 2,
+      crew: 'harbor_kings',
       tagline: 'North Gate to the waterfront, threading the Convention superblock.',
       route: ['n3_0', 'n3_2', 'n5_2', 'n5_5', 'n2_5', 'n2_6', 'n3_6'],
       opponents: 3,
@@ -69,6 +70,7 @@
       name: 'Old Town Alley Dash',
       type: 'sprint',
       tier: 3,
+      crew: 'redline_syndicate',
       tagline: 'Narrow alleys, blind exits, no traffic to hide behind — just rivals.',
       route: ['n2_6', 'n1_6', 'n1_4', 'n0_4', 'n0_2', 'n2_2', 'n2_3'],
       opponents: 3,
@@ -76,6 +78,19 @@
       rivalCars: ['veloce_v12_stradale', 'veloce_v10_corsa', 'veloce_v8_gt'],
       rewards: { credits: [3400, 2100, 1300, 600], reputation: [560, 340, 210, 90] },
       unlockRep: 1000
+    },
+    {
+      id: 'apex_drift_nights',
+      name: 'Drift Nights',
+      type: 'drift',
+      tier: 2,
+      crew: 'iron_district',
+      tagline: 'Slide the full Apex Loop under the neon. The Iron District crew is judging.',
+      route: ['n0_3', 'n0_0', 'n6_0', 'n6_6', 'n3_6'],
+      opponents: 0,
+      driftTargets: { gold: 1000, silver: 600, bronze: 300 },
+      rewards: { credits: { gold: 2200, silver: 1500, bronze: 900, none: 300 }, reputation: { gold: 360, silver: 230, bronze: 130, none: 35 } },
+      unlockRep: 1200
     }
   ];
 })();

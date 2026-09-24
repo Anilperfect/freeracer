@@ -6,7 +6,8 @@
  * cinematic backdrop for the menu.
  */
 (function () {
-  const GAME_VERSION = 'v0.3.0 — Phase 2 vehicle system';
+  const GAME_VERSION = 'v0.6.1 — Neon Coast complete';
+  window.FREERACER_VERSION = 'v0.6.1';
 
   class MainMenuManager {
     constructor(game) {
@@ -135,13 +136,22 @@
       const info = sm.getLevelInfo();
       const prog = sm.getProfile().progress;
       const car = window.getCarById ? window.getCarById(sm.getSelectedCarId()) : null;
-      const events = window.DistrictApexDowntownEvents ? window.DistrictApexDowntownEvents.length : 0;
-      const discoveries = window.DistrictApexDowntown ? window.DistrictApexDowntown.discoveries.length : 0;
+      const totals = window.DistrictRegistry ? window.DistrictRegistry.totals() : {
+        districts: 1,
+        events: window.DistrictApexDowntownEvents ? window.DistrictApexDowntownEvents.length : 0,
+        discoveries: window.DistrictApexDowntown ? window.DistrictApexDowntown.discoveries.length : 0
+      };
+      const events = totals.events;
+      const discoveries = totals.discoveries;
+      const unlockedDistricts = window.DistrictRegistry ? window.DistrictRegistry.unlocked().length : 1;
+      const lastDistrict = prog.lastDistrict && window.DistrictRegistry && window.DistrictRegistry.get(prog.lastDistrict)
+        ? window.DistrictRegistry.get(prog.lastDistrict).name : 'Apex Downtown';
       this.profileCard.innerHTML = `
         <div class="mm-profile-row big"><span>₡ ${sm.getCash().toLocaleString()}</span><span>LV ${info.level} · ${info.title}</span></div>
         <div class="mm-rep-bar"><div class="mm-rep-fill" style="width:${Math.round(info.progress * 100)}%"></div></div>
         <div class="mm-profile-row"><span>Reputation</span><span>${info.reputation}${info.nextRep ? ` / ${info.nextRep}` : ' (max)'}</span></div>
         <div class="mm-profile-row"><span>Current car</span><span>${car ? car.name : '—'}</span></div>
+        <div class="mm-profile-row"><span>Districts</span><span>${unlockedDistricts} / ${totals.districts} unlocked</span></div>
         <div class="mm-profile-row"><span>Events cleared</span><span>${Object.keys(prog.eventRecords).length} / ${events}</span></div>
         <div class="mm-profile-row"><span>Discoveries</span><span>${prog.discoveries.length} / ${discoveries}</span></div>
         <div class="mm-profile-row"><span>Distance driven</span><span>${(prog.distanceKm || 0).toFixed(1)} km</span></div>
@@ -149,7 +159,7 @@
       const drive = document.getElementById('btn-mm-drive');
       if (drive) drive.disabled = !this.worldReady;
       const driveSub = document.getElementById('btn-mm-drive-sub');
-      if (driveSub) driveSub.textContent = prog.lastPosition ? 'Continue in Apex Downtown' : 'Free roam · Apex Downtown';
+      if (driveSub) driveSub.textContent = prog.lastPosition ? `Continue in ${lastDistrict}` : `Free roam · ${lastDistrict}`;
     }
 
     flash(text) {

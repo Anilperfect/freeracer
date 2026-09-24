@@ -72,6 +72,8 @@
       reputation: 0,
       eventRecords: {},      // eventId → { bestTime, bestPosition, medal, plays, wins }
       discoveries: [],       // discovery ids found in the world
+      caches: [],            // neon cache (collectible) ids found in the world
+      championship: {},      // champId → { points, positions: {eventId: pos}, completed }
       distanceKm: 0,
       driftPoints: 0,
       eventsPlayed: 0,
@@ -94,7 +96,12 @@
       racingLine: true,
       racingLineOpacity: 0.7,
       trafficDensity: 'normal',
-      minimapRotate: true
+      minimapRotate: true,
+      dayNightCycle: true,
+      freeRoamWeather: true,
+      keyBindings: null,     // filled by FreeRacerControls on first rebind
+      accessibility: null,   // filled by Accessibility on first change
+      mapFilters: { events: true, garage: true, discoveries: true, caches: true }
     }
   };
 
@@ -396,6 +403,49 @@
       this.profile.progress.discoveries.push(id);
       this.save();
       return true;
+    }
+
+    // ── Neon caches (collectibles) ──────────────────────────────────────────
+    hasCache(id) { return (this.profile.progress.caches || []).includes(id); }
+
+    addCache(id) {
+      if (!Array.isArray(this.profile.progress.caches)) this.profile.progress.caches = [];
+      if (this.hasCache(id)) return false;
+      this.profile.progress.caches.push(id);
+      this.save();
+      return true;
+    }
+
+    // ── Championships ─────────────────────────────────────────────────────
+    getChampionship(champId) {
+      if (!this.profile.progress.championship) this.profile.progress.championship = {};
+      return this.profile.progress.championship[champId] || null;
+    }
+
+    /**
+     * Record one championship round result.
+     * @returns {{ points: number, completed: boolean, isChampion: boolean, entry: object }}
+     */
+    recordChampionshipResult(champDef, eventId, position) {
+      if (!this.profile.progress.championship) this.profile.progress.championship = {};
+      const table = champDef.points || [10, 7, 5, 3, 2, 1];
+      const pts = table[Math.min(Math.max(1, position), table.length) - 1] || 0;
+      let entry = this.profile.progress.championship[champDef.id];
+      if (!entry) entry = this.profile.progress.championship[champDef.id] = { points: 0, positions: {}, completed: false };
+      if (!entry.positions) entry.positions = {};
+      // Re-running a round keeps the best position (points recomputed from bests)
+      if (!entry.positions[eventId] || position < entry.positions[eventId]) entry.positions[eventId] = position;
+      entry.points = Object.values(entry.positions).reduce((s, p) => s + (table[Math.min(Math.max(1, p), table.length) - 1] || 0), 0);
+      const wasCompleted = !!entry.completed;
+      entry.completed = champDef.events.every((e) => entry.positions[e] !== undefined);
+      // Champion = completed with the maximum possible score (won every round)
+      const maxScore = champDef.events.length * (table[0] || 10);
+      const isChampion = entry.completed && entry.points >= maxScore;
+      if (entry.completed && !wasCompleted) {
+        // one-time completion bonus handled by the caller via champDef.championBonus
+      }
+      this.save();
+      return { points: entry.points, completed: entry.completed, isChampion, entry, roundPoints: pts, firstCompletion: entry.completed && !wasCompleted };
     }
 
     // ── Misc progress ─────────────────────────────────────────────────────

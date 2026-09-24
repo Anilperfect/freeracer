@@ -72,6 +72,7 @@ class ChaseCamera {
 
   addShake(amount = 0.5) {
     if (!this.enableShake) return;
+    if (window.Accessibility && window.Accessibility.get('reduceMotion')) return;
     this.shakeIntensity = Math.min(1.5, this.shakeIntensity + amount);
   }
 

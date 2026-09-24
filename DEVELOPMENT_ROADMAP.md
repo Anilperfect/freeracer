@@ -43,29 +43,29 @@ the session report); the world is flat (no heightmap yet); the rival roster reus
 - ✅ Tuning (free, per car): brake bias, downforce, final drive, steering, ride height + presets Balanced / Grip / Drift / Sprint / Off-Road.
 - ✅ Garage: live stat bars with hover before/after ghosts and PR delta, Parts/Tuning sub-tabs, wallet display, stage pips.
 - ✅ Test-drive of locked cars from the garage (events disabled, selection unchanged, returns to the garage focused on that car).
-- ⬜ Off-Road Truck archetype + dedicated mesh (arrives with Red Mesa Canyon in Phase 3)
+- ✅ Off-Road Truck archetype + dedicated mesh — **Ironclad Ridgeback** shipped in v0.6.1 (`bodyStyle: 'truck'`, 18" wheels, lifted anchors)
 - ⬜ Dyno / before-after graph view (bars with deltas ship now; graph is cosmetic)
-- ⬜ Extended cosmetics (secondary paint, body kits, spoilers, wheel size, tint, plates, decals)
+- ✅ Extended cosmetics (v0.6.1: secondary paint, brake calipers, bolt-on spoilers, window tint); ⬜ body kits, wheel size, plates, decals
 - ⬜ Per-drivetrain handling personality pass (FWD/RWD/AWD launch + throttle-steer differences)
 
-## Phase 3 — Open-world expansion ⬜
-- ⬜ Remaining six districts as data files + district-specific builders (terrain heightmap for canyon/mountain)
-- ⬜ Highways/bridges/tunnels connecting districts; district unlocks by reputation
-- ⬜ Map filters, fast travel to discovered garages
-- ⬜ Day/night cycle and weather in free roam (pipeline already supports profiles)
-- ⬜ Streaming: district chunk load/unload, LOD for buildings, traffic density by quality preset
+## Phase 3 — Open-world expansion 🟨 (v0.6.1 — Neon Coast trio done, highways/streaming pending)
+- ✅ Harborline + Sunspire Coast districts as data files (`js/openworld/districts/`) with themed builders (industrial ground, container yards, beach/sand, themed density/signage/height) + per-district garages and climates
+- ✅ District unlocks by reputation (0 / 1500 / 3500 REP via `DistrictRegistry`); ⬜ highways/bridges/tunnels between districts
+- ✅ Map filters (1–4), fast travel to district garages from the pause menu
+- ✅ Day/night cycle (8-minute day, deep-night peak) and free-roam weather (clear/fog/rain) with wet-road grip
+- ⬜ Streaming: district chunk load/unload, LOD for buildings, traffic density by quality preset (auto quality preset ships in v0.6.1 as a first step)
 
-## Phase 4 — Content & progression ⬜
-- ⬜ Rival crews (Harbor Kings, Redline Syndicate, Canyon Wolves, Neon Circuit, Iron District Crew) with leaders, territories and story beats
-- ⬜ More event types (drag, drift, speed trap, jump, off-road, elimination, rival, tournament, delivery)
-- ⬜ Championship finale
-- ⬜ Progression screen, collectibles, photo spots
+## Phase 4 — Content & progression 🟨 (v0.6.1 — crews/drift/championships/caches done)
+- ✅ Rival crews (Harbor Kings, Redline Syndicate, Neon Circuit, Iron District Crew) with named rosters, cars and skill (`js/crewsData.js`); ⬜ leaders, territories, story beats, Canyon Wolves
+- ✅ Drift events with target scores + drift HUD; ⬜ drag, speed trap, jump, off-road, elimination, rival, tournament, delivery
+- ✅ Championship series (Neon Coast Cup, Harbor Kings Showdown, Sunspire Sunset Series) with round points + completion bonuses
+- ✅ Collectibles (16 neon caches); ⬜ progression screen, photo spots
 - ⬜ AI variety (styles, mistakes, recovery), heat/pursuit system last
 
-## Phase 5 — Polish & release ⬜
-- ⬜ Controller navigation for every menu, remappable controls
-- ⬜ Accessibility panel (colorblind indicators, text scale, motion reduction, subtitles for announcer)
-- ⬜ Performance pass on low-end (dynamic resolution, shadow cascades off)
+## Phase 5 — Polish & release 🟨 (v0.6.1 — remapping/a11y/auto-quality done)
+- ✅ Remappable keyboard controls + gamepad navigation for the pause menu; ⬜ full controller navigation for every menu
+- ✅ Accessibility panel (color-blind palettes, text scale, motion reduction, announcer subtitles, high-contrast HUD)
+- ✅ Auto graphics quality for free roam (dynamic resolution/shadow stepping); ⬜ full low-end pass (shadow cascades off)
 - ⬜ Full new-game → endgame playtest, browser matrix
 
 ## Known limitations (honest list)
