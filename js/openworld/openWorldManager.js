@@ -159,6 +159,7 @@
       this.camera.updateProjectionMatrix();
 
       const carId = opts.carId || (window.SaveManager ? window.SaveManager.getSelectedCarId() : 'v01_kairo_pulse_s');
+      this.testDrive = !!opts.testDrive;
       this.spawnPlayer(carId, this.resolveSpawn(opts.spawn));
 
       const density = window.SaveManager ? window.SaveManager.getSetting('trafficDensity', 'normal') : 'normal';
@@ -185,6 +186,9 @@
         profile.progress.introSeen = true;
         window.SaveManager.save();
         this.toast(`Welcome to ${this.district.name}. Drive into a glowing pad to start an event.`, 'info', 6);
+      } else if (this.testDrive) {
+        const cfg = window.getCarById(this.playerCarId);
+        this.toast(`Test drive: ${cfg ? cfg.name : this.playerCarId}. Events are disabled — drive back to the garage to buy it.`, 'info', 6);
       } else {
         this.toast(`${this.district.name}`, 'info', 3);
       }
@@ -218,7 +222,8 @@
       this.scene.add(this.playerCar.group);
       if (window.SaveManager) {
         const profile = window.SaveManager.getProfile();
-        if (profile.upgrades && profile.upgrades[cfg.id]) this.player.applyUpgrades(profile.upgrades[cfg.id]);
+        if (window.UpgradeSystem) this.player.applyModifiers(window.UpgradeSystem.getModifiers(cfg.id));
+        else if (profile.upgrades && profile.upgrades[cfg.id]) this.player.applyUpgrades(profile.upgrades[cfg.id]);
         if (profile.cosmetics && profile.cosmetics[cfg.id] && this.playerCar.setCustomization) this.playerCar.setCustomization(profile.cosmetics[cfg.id]);
         this.player.setAssistLevel(window.SaveManager.getAssistLevel());
       }
@@ -395,9 +400,13 @@
       if (this.garageRing) { const s = 1 + Math.sin(this.time * 3) * 0.05; this.garageRing.scale.set(s, 1, s); }
       // prompt
       if (nearEvent) {
-        this.setPrompt(nearEvent.unlocked
-          ? { key: 'E', text: `Start ${nearEvent.name}`, sub: window.EventSystem.typeLabel(nearEvent), action: () => this.startEvent(nearEvent) }
-          : { key: null, text: `${nearEvent.name} — locked`, sub: `Reach ${nearEvent.def.unlockRep} REP to unlock`, action: null });
+        if (this.testDrive) {
+          this.setPrompt({ key: null, text: `${nearEvent.name} — test drive`, sub: 'Buy this car in the garage to enter events', action: null });
+        } else {
+          this.setPrompt(nearEvent.unlocked
+            ? { key: 'E', text: `Start ${nearEvent.name}`, sub: window.EventSystem.typeLabel(nearEvent), action: () => this.startEvent(nearEvent) }
+            : { key: null, text: `${nearEvent.name} — locked`, sub: `Reach ${nearEvent.def.unlockRep} REP to unlock`, action: null });
+        }
       } else if (this.nearGarage) {
         this.setPrompt({ key: 'E', text: 'Enter Garage', sub: 'Tune, paint or switch your car', action: () => this.enterGarage() });
       } else {
@@ -460,7 +469,7 @@
 
     // ── Events / garage transitions ───────────────────────────────────────
     startEvent(ev) {
-      if (!this.events || this.events.state !== 'idle') return;
+      if (!this.events || this.events.state !== 'idle' || this.testDrive) return;
       this.setPrompt(null);
       if (this.events.begin(ev, this.player)) {
         this.toast(`${ev.name} — ${window.EventSystem.typeLabel(ev)}`, 'info', 3);

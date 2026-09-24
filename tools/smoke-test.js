@@ -331,6 +331,97 @@ const waitFor = async (pred, ms = 8000) => { const t0 = Date.now(); while (!pred
   report('Pause → MAIN MENU', Game.gameState === 'MAIN_MENU' && !ow.active && visible('main-menu'), `state=${Game.gameState}`);
   await frames(10);
 
+  // ── D2. Phase 2: roster, parts, tuning, test drive ──────────────────────
+  {
+    const SM = window.SaveManager; const US = window.UpgradeSystem;
+    report('UpgradeSystem + PartsCatalog loaded', !!US && !!window.PartsCatalog && US.catalog.categories.length === 8, US ? `${US.catalog.categories.length} categories` : 'missing');
+    report('Roster has 10 cars across manufacturers', window.CarDatabase.length >= 10 && new Set(window.CarDatabase.map(c => c.manufacturer)).size >= 6, `${window.CarDatabase.length} cars, ${new Set(window.CarDatabase.map(c => c.manufacturer)).size} makers`);
+    // every car builds a mesh + physics modifiers without throwing
+    let built = 0; const errs = [];
+    window.CarDatabase.forEach((c) => {
+      try {
+        const m = new window.CarModel(c.colorHex, false, c.id, 0);
+        const mods = US.getModifiers(c.id);
+        if (m.group && Number.isFinite(mods.power) && mods.power > 0) built++;
+        m.group.traverse((o) => { if (o.geometry) o.geometry.dispose(); });
+      } catch (e) { errs.push(`${c.id}: ${e.message}`); }
+    });
+    report('All cars build a model + modifier set', built === window.CarDatabase.length && errs.length === 0, errs[0] || `${built}/${window.CarDatabase.length}`);
+
+    // garage from menu → parts tab renders 8 rows with stage pips
+    click('btn-mm-garage'); await sleep(30);
+    const ws = Game.workshop;
+    report('Main menu → GARAGE', Game.gameState === 'WORKSHOP' && visible('workshop-screen'), `state=${Game.gameState}`);
+    const rows = doc.querySelectorAll('#ws-upgrade-rows .ws-part');
+    const statBars = doc.querySelectorAll('#ws-live-stats .ws-stat');
+    report('Garage shows 8 part categories + 6 live stat bars', rows.length === 8 && statBars.length === 6, `${rows.length} rows, ${statBars.length} bars`);
+
+    const carId = ws.allCars[ws.carIndex].id;
+    const prBefore = US.calculatePR(carId);
+    const cashBefore = SM.getCash();
+    const cost = US.getNextStageCost(carId, 'engine');
+    SM.addCash(Math.max(0, cost - cashBefore + 100));
+    ws.updateUI();
+    const installBtn = doc.querySelector('#ws-upgrade-rows .ws-install[data-cat="engine"]');
+    report('Engine INSTALL button enabled once affordable', !!installBtn && !installBtn.disabled && installBtn.classList.contains('ok'), installBtn ? installBtn.textContent : 'missing');
+    installBtn.dispatchEvent(new window.MouseEvent('mouseenter', { bubbles: true }));
+    const previewDelta = doc.querySelector('#ws-live-stats .ws-delta.up');
+    report('Hovering a part previews stat gains', !!previewDelta, previewDelta ? previewDelta.textContent : 'no delta shown');
+    installBtn.click(); await sleep(5);
+    const cashAfter = SM.getCash();
+    report('Installing engine stage 1 spends credits + raises PR', US.getParts(carId).engine === 1 && cashAfter === cashBefore + Math.max(0, cost - cashBefore + 100) - cost && US.calculatePR(carId) > prBefore, `PR ${prBefore} → ${US.calculatePR(carId)}, cost ₡${cost}`);
+    const mods = US.getModifiers(carId);
+    report('Engine stage 1 modifies power (>1) and mass (≥1)', mods.power > 1.0 && mods.mass >= 1.0, `power ×${mods.power.toFixed(3)} mass ×${mods.mass.toFixed(3)}`);
+    // trade-off: max aero should cut top speed
+    const aeroPreview = US.getModifiers(carId, { previewCategory: 'aero' });
+    const aeroBad = window.UpgradeSystem.constructor.describeEffects(US.getNextStage(carId, 'aero').effects).some((e) => !e.good);
+    report('Aero preview shows trade-off (grip ↑, drag ↑ flagged as downside)', aeroPreview.grip > mods.grip && aeroPreview.drag > mods.drag && aeroBad, `grip ×${aeroPreview.grip.toFixed(3)} drag ×${aeroPreview.drag.toFixed(3)}`);
+
+    // tuning: preset + slider + persistence
+    click('ws-subtab-tuning'); await sleep(5);
+    report('TUNING sub-tab shows 5 sliders + 5 presets', doc.querySelectorAll('#ws-tuning-panel input[type=range]').length === 5 && doc.querySelectorAll('#ws-tuning-panel .ws-preset').length === 5 && doc.getElementById('ws-tuning-panel').style.display === 'block');
+    doc.querySelector('#ws-tuning-panel .ws-preset[data-preset="drift"]').click(); await sleep(5);
+    report('Drift preset applies rear brake bias', US.activePresetId(carId) === 'drift' && US.getTuning(carId).brakeBias < 0, JSON.stringify(US.getTuning(carId)));
+    const slider = doc.querySelector('#ws-tuning-panel input[data-slider="downforce"]');
+    slider.value = '1'; slider.dispatchEvent(new window.Event('input', { bubbles: true })); slider.dispatchEvent(new window.Event('change', { bubbles: true }));
+    report('Downforce slider change stored (custom setup)', US.getTuning(carId).downforce === 1 && US.activePresetId(carId) === null);
+    const tuned = US.getModifiers(carId); const untuned = US.getModifiers(carId, { tuning: { downforce: 0 } });
+    report('High downforce tuning: drag ↑ grip ↑ vs untuned', tuned.drag > untuned.drag && tuned.grip > untuned.grip && US.getDisplayStats(carId).topSpeed <= US.getDisplayStats(carId, { tuning: { downforce: 0 } }).topSpeed, `drag ×${tuned.drag.toFixed(3)} grip ×${tuned.grip.toFixed(3)}`);
+    const rawSave = JSON.parse(window.localStorage.getItem(SM.storageKey));
+    report('Parts + tuning persisted in save', rawSave.parts && rawSave.parts[carId] && rawSave.parts[carId].engine === 1 && rawSave.tuning && rawSave.tuning[carId] && rawSave.tuning[carId].downforce === 1);
+
+    // legacy migration: old-style upgrade levels become stages
+    {
+      const sm3 = new SM.constructor();
+      sm3.profile.parts = {}; sm3.profile.tuning = {}; sm3.profile.partsMigrated = false;
+      sm3.profile.upgrades = { veloce_v10_corsa: { acceleration: 10, tireGrip: 5, braking: 1, nitroCapacity: 6 } };
+      const savedRef = window.SaveManager; window.SaveManager = sm3;
+      US.ensureProfile(sm3.profile);
+      window.SaveManager = savedRef;
+      report('Legacy 10-level upgrades migrate to stages', sm3.profile.partsMigrated === true && sm3.profile.parts.veloce_v10_corsa.engine === 5 && sm3.profile.parts.veloce_v10_corsa.tires >= 2 && sm3.profile.parts.veloce_v10_corsa.nitro >= 2, JSON.stringify(sm3.profile.parts.veloce_v10_corsa));
+    }
+
+    // test drive a locked car
+    click('ws-subtab-parts'); await sleep(5);
+    const lockedIdx = ws.allCars.findIndex((c) => !SM.isCarUnlocked(c.id));
+    ws.carIndex = lockedIdx; ws.updateUI(); await sleep(5);
+    const lockedCar = ws.allCars[lockedIdx];
+    const lockedInstall = doc.querySelector('#ws-upgrade-rows .ws-install[data-cat="engine"]');
+    report('Locked car: install disabled, TEST DRIVE + PURCHASE shown', lockedInstall && lockedInstall.disabled && !doc.getElementById('btn-test-drive').classList.contains('hidden') && doc.getElementById('btn-select-car').textContent.startsWith('PURCHASE'), lockedCar.name);
+    click('btn-test-drive'); await sleep(30);
+    report('TEST DRIVE → free roam in the locked car, events disabled', Game.gameState === 'FREE_ROAM' && ow.active && ow.testDrive === true && ow.playerCarId === lockedCar.id && SM.getSelectedCarId() !== lockedCar.id, `car=${ow.playerCarId} selected=${SM.getSelectedCarId()}`);
+    const evTest = ow.events.events.find((e) => e.unlocked);
+    ow.player.teleport(evTest.marker.x - evTest.marker.dx * 2, evTest.marker.z - evTest.marker.dz * 2, Math.atan2(evTest.marker.dx, evTest.marker.dz));
+    await frames(10);
+    key('KeyE'); await frames(3);
+    report('Test drive cannot start events', ow.events.state === 'idle' && ow.prompt && /test drive/i.test(ow.prompt.text || ''), ow.prompt ? ow.prompt.text : 'no prompt');
+    ow.enterGarage(); await sleep(30);
+    report('Test drive → garage focuses the tested car', Game.gameState === 'WORKSHOP' && ws.allCars[ws.carIndex].id === lockedCar.id, `state=${Game.gameState} car=${ws.allCars[ws.carIndex].id}`);
+    click('btn-ws-main-menu'); await sleep(30);
+    report('Garage → MAIN MENU', Game.gameState === 'MAIN_MENU', `state=${Game.gameState}`);
+    await frames(10);
+  }
+
   // ── E. Circuit events (legacy flow) ─────────────────────────────────────
   click('btn-mm-circuits'); await sleep(30);
   report('Menu → circuit map select', Game.gameState === 'MAP_SELECT' && visible('map-select-screen'), `state=${Game.gameState}`);

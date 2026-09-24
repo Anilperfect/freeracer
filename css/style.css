@@ -2079,3 +2079,62 @@ html, body {
 .ow-reward.rep { color: #ff3cac; background: rgba(255, 60, 172, 0.08); border: 1px solid rgba(255, 60, 172, 0.35); }
 .ow-results-level { margin-top: 12px; font-family: 'Rajdhani', sans-serif; letter-spacing: 1px; color: #c9d4ff; font-size: 0.9rem; }
 .ow-hidden { display: none !important; }
+
+/* ═══════════════════════════════════════════════
+   GARAGE — PARTS, TUNING & LIVE STATS (Phase 2)
+   ═══════════════════════════════════════════════ */
+.workshop-right-panel { width: 420px; max-height: calc(100vh - 140px); overflow-y: auto; }
+#ws-panel-upgrades { max-height: min(340px, calc(100vh - 500px)); min-height: 180px; padding-right: 4px; }
+.ws-live-stats { display: flex; flex-direction: column; gap: 5px; margin: 6px 0 12px; }
+.ws-stat { display: grid; grid-template-columns: 82px 1fr 58px; align-items: center; gap: 8px; font-size: 10px; font-family: 'Orbitron', sans-serif; }
+.ws-stat-label { color: #8899aa; letter-spacing: 0.5px; }
+.ws-stat-val { text-align: right; color: #e8f4ff; font-family: 'Rajdhani', sans-serif; font-weight: 700; font-size: 13px; }
+.ws-bar { position: relative; height: 8px; background: rgba(255,255,255,0.08); border-radius: 4px; overflow: hidden; }
+.ws-bar-fill { height: 100%; background: linear-gradient(90deg, #00a8c8, #00f0ff); border-radius: 4px; transition: width 0.25s ease; }
+.ws-bar-ghost { position: absolute; top: 0; height: 100%; }
+.ws-bar-ghost.up { background: rgba(125,255,106,0.85); }
+.ws-bar-ghost.down { background: rgba(255,107,107,0.9); }
+.ws-delta { margin-left: 4px; font-size: 11px; }
+.ws-delta.up { color: #7dff6a; }
+.ws-delta.down { color: #ff6b6b; }
+
+.ws-subtabs { display: flex; gap: 6px; margin-bottom: 10px; }
+.ws-subtab { flex: 1; padding: 6px 4px; font-family: 'Orbitron', sans-serif; font-size: 10px; letter-spacing: 1px; background: rgba(255,255,255,0.06); color: #8899aa; border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; cursor: pointer; }
+.ws-subtab.active { background: rgba(0,240,255,0.15); color: #00f0ff; border-color: #00f0ff; }
+
+.ws-wallet { display: flex; justify-content: space-between; align-items: center; font-family: 'Orbitron', sans-serif; font-size: 10px; color: #8899aa; background: rgba(255,215,0,0.06); border: 1px solid rgba(255,215,0,0.2); border-radius: 4px; padding: 6px 10px; margin-bottom: 10px; }
+.ws-wallet span:last-child { color: #ffd700; font-size: 13px; }
+.ws-note { font-family: 'Rajdhani', sans-serif; font-size: 13px; color: #8899aa; padding: 6px 2px 10px; line-height: 1.35; }
+
+.ws-part { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07); border-radius: 6px; padding: 8px 10px; margin-bottom: 8px; transition: border-color 0.2s; }
+.ws-part:hover { border-color: rgba(0,240,255,0.35); }
+.ws-part-head { display: flex; align-items: center; gap: 8px; }
+.ws-part-icon { font-size: 16px; width: 22px; text-align: center; }
+.ws-part-title { flex: 1; font-family: 'Orbitron', sans-serif; font-size: 11px; color: #e8f4ff; letter-spacing: 0.5px; }
+.ws-part-sub { font-family: 'Rajdhani', sans-serif; font-size: 12px; color: #8899aa; letter-spacing: 0; margin-top: 1px; }
+.ws-part-sub b { color: #00f0ff; font-weight: 600; }
+.ws-pips { display: flex; gap: 3px; }
+.ws-pip { width: 9px; height: 9px; border-radius: 2px; background: rgba(255,255,255,0.12); }
+.ws-pip.on { background: #00f0ff; box-shadow: 0 0 6px rgba(0,240,255,0.6); }
+.ws-part-body { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 7px; }
+.ws-effects { display: flex; flex-wrap: wrap; gap: 4px; flex: 1; }
+.ws-eff { font-family: 'Rajdhani', sans-serif; font-size: 11px; font-weight: 700; padding: 1px 6px; border-radius: 3px; background: rgba(255,255,255,0.06); color: #cdd6e0; }
+.ws-eff.good { color: #7dff6a; background: rgba(125,255,106,0.1); }
+.ws-eff.bad { color: #ff8a8a; background: rgba(255,107,107,0.12); }
+.ws-eff.neutral { font-weight: 500; color: #8899aa; }
+.ws-install { flex-shrink: 0; min-width: 118px; padding: 6px 8px; font-family: 'Orbitron', sans-serif; font-size: 9px; letter-spacing: 0.5px; border-radius: 4px; border: 1px solid transparent; cursor: pointer; transition: transform 0.1s, filter 0.15s; }
+.ws-install.ok { background: #00f0ff; color: #0a0e17; font-weight: 700; }
+.ws-install.ok:hover { filter: brightness(1.15); transform: translateY(-1px); }
+.ws-install.no, .ws-install:disabled { background: rgba(255,255,255,0.06); color: #667788; border-color: rgba(255,255,255,0.1); cursor: not-allowed; }
+
+.ws-presets { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; margin-bottom: 10px; }
+.ws-preset { padding: 6px 2px; font-family: 'Orbitron', sans-serif; font-size: 8px; letter-spacing: 0.5px; background: rgba(255,255,255,0.05); color: #8899aa; border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; cursor: pointer; }
+.ws-preset.active { background: rgba(255,215,0,0.15); color: #ffd700; border-color: #ffd700; }
+.ws-slider { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07); border-radius: 6px; padding: 8px 10px; margin-bottom: 8px; }
+.ws-slider-head { display: flex; justify-content: space-between; font-family: 'Orbitron', sans-serif; font-size: 10px; color: #e8f4ff; }
+.ws-slider-val { color: #00f0ff; }
+.ws-slider-row { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+.ws-slider-end { font-family: 'Rajdhani', sans-serif; font-size: 11px; color: #8899aa; width: 56px; }
+.ws-slider-end:last-child { text-align: right; }
+.ws-slider-row input[type=range] { flex: 1; accent-color: #00f0ff; cursor: pointer; }
+.ws-slider-hint { font-family: 'Rajdhani', sans-serif; font-size: 11px; color: #667788; margin-top: 4px; }

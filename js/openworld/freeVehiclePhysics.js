@@ -155,6 +155,8 @@
       this.assistLevel = 'standard';
       this.assist = ASSIST_PRESETS.standard;
       this.stabilityBonus = 1.0;
+      this.roughGripScale = 1.0;   // grip retained off the asphalt (suspension/tyre/ride-height trade-off)
+      this.nitroPowerMult = 1.0;
 
       // ── Respawn anchor (set by the event system) ──
       this.checkpointRespawn = null;
@@ -278,6 +280,7 @@
         if (this.nitroTier === 'overdrive') { mult = 1.70 * 1.45; rate = 34.0; }
         else if (this.nitroTier === 'precision') { mult = 1.70 * 1.18; rate = 13.5; }
         else { this.nitroTier = 'standard'; mult = 1.70; }
+        mult = 1 + (mult - 1) * this.nitroPowerMult;
         this.nitroFuel = Math.max(0, this.nitroFuel - (rate / Math.max(0.5, this.nitroEfficiency)) * dt);
       } else {
         this.nitroTier = 'none';
@@ -293,6 +296,7 @@
       const t = typeof res === 'string' ? res : ((res && res.type) || 'asphalt');
       this.surfaceType = t;
       this.surfaceMu = SURFACE_MU[t] !== undefined ? SURFACE_MU[t] : 1.0;
+      if (t !== 'asphalt' && t !== 'plaza') this.surfaceMu *= this.roughGripScale;
       this.surfaceMu *= (1 - this.surfaceWetness * 0.3);
     }
 
@@ -777,6 +781,34 @@
     }
 
     respawnAtCheckpoint() { this.resetToRoad(); }
+
+    /**
+     * Apply a UpgradeSystem modifier vector (parts + tuning). Idempotent: always
+     * derived from the stock values captured in the constructor.
+     */
+    applyModifiers(m) {
+      if (!m) return;
+      if (!this._stock) {
+        this._stock = { mass: this.mass, maxSpeed: this.maxSpeed, brake: this.brakeDeceleration, cdA: this.cdA, cornering: this.corneringStiffness, steer: this.steerResponse, drift: this.driftMultiplier, maxNitro: this.maxNitro };
+      }
+      const s = this._stock;
+      this.mass = s.mass * m.mass;
+      this.Iz = this.mass * (this.wheelbase * this.wheelbase + (this.halfWidth * 2) ** 2) / 12 * 1.15;
+      this.acceleration = this.baseAcceleration * m.power / m.mass;
+      this.maxSpeed = Math.min(100, s.maxSpeed * m.topSpeed / Math.pow(m.drag, 0.33));
+      this.cdA = s.cdA * m.drag;
+      this.brakeDeceleration = s.brake * m.brake / Math.pow(m.mass, 0.5);
+      this.tireGrip = m.grip;
+      this.corneringStiffness = s.cornering * Math.sqrt(m.handling);
+      this.steerResponse = s.steer * Math.sqrt(m.handling);
+      this.stabilityBonus = m.stability;
+      this.driftMultiplier = s.drift * m.driftability;
+      this.roughGripScale = m.rough;
+      this.maxNitro = s.maxNitro * m.nitroCapacity;
+      this.nitroFuel = Math.min(this.nitroFuel, this.maxNitro) || this.maxNitro;
+      this.nitroEfficiency = m.nitroEfficiency;
+      this.nitroPowerMult = m.nitroPower;
+    }
 
     /** Instant placement (debug / tests / event grid). */
     teleport(x, z, yaw) { this.setPose(x, z, yaw); }

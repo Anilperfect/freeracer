@@ -976,6 +976,23 @@ class ArcadeCarPhysics {
     }
   }
 
+  /** Apply a UpgradeSystem modifier vector (parts + tuning) — circuit controller. */
+  applyModifiers(m) {
+    if (!m) return;
+    if (!this._stock) {
+      this._stock = { brake: this.brakeDeceleration, agility: this.lateralAgility, grip: this.tireGrip, maxNitro: this.maxNitro, maxSpeed: this.maxSpeed };
+    }
+    const s = this._stock;
+    this.acceleration = this.baseAcceleration * m.power / m.mass;
+    this.brakeDeceleration = s.brake * m.brake / Math.pow(m.mass, 0.5);
+    this.lateralAgility = s.agility * m.handling * m.stability;
+    this.tireGrip = s.grip * m.grip;
+    this.maxNitro = s.maxNitro * m.nitroCapacity;
+    this.nitroFuel = this.maxNitro;
+    this.nitroEfficiency = m.nitroEfficiency;
+    this.maxSpeed = Math.min(VEHICLE_PHYSICS_CONSTANTS.MAX_SPEED_CAP, s.maxSpeed * m.topSpeed / Math.pow(m.drag, 0.33));
+  }
+
   getSpeedKmh() {
     // Certified up to 450 km/h display range
     return THREE.MathUtils.clamp(Math.round(this.speed * 3.6), 0, 450);

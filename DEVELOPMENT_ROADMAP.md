@@ -36,14 +36,17 @@ Legend: ✅ done · 🔄 in progress · ⬜ planned · ⚠️ limitation
 Known Phase 1 limitations: no real-browser GPU profiling was possible in the build sandbox (see TESTING notes in
 the session report); the world is flat (no heightmap yet); the rival roster reuses existing car meshes.
 
-## Phase 2 — Core vehicle system ⬜
-- ⬜ 8-archetype roster (add Drift Coupe, Rally Hatch, Off-Road Truck, Beginner Street) with new meshes
-- ⬜ Part-based upgrades (Engine/Drivetrain/Tires/Brakes/Suspension/Aero/Weight/Nitro, Stage 1–5) replacing flat stat levels; trade-offs
-- ⬜ Tuning screen (brake balance, downforce, gear ratio, ride height) + dyno & before/after graphs
-- ⬜ Garage presets (Grip / Drift / Sprint / Off-Road / Balanced)
+## Phase 2 — Core vehicle system 🟨 (v0.3.0 — core done, cosmetics/off-road pending)
+- ✅ Roster expanded to 10 cars / 8 manufacturers (`js/carDataNeonCoast.js`): Radian Sprint 4 (Rally Hatch, AWD), Veyra Corsair (Drift Coupe, RWD), Monarch Sovereign GT (Muscle GT), Voltrix Ion (Electric Sport, AWD), Apex Forge Halo (Hypercar flagship). Cars pick their procedural body via data (`bodyStyle`), plus per-car accent colour and spoke count.
+- ✅ Part-based upgrades (`js/partsData.js`, `js/upgradeSystem.js`): 8 categories × 5 named stages with trade-offs (aero adds drag, tyres cost driftability, weight reduction costs stability…). Legacy 10-level stat upgrades migrate once into stages.
+- ✅ Modifier vector drives both physics models (`FreeVehiclePhysics.applyModifiers`, `ArcadeCarPhysics.applyModifiers`) — no more per-stat multipliers scattered across code.
+- ✅ Tuning (free, per car): brake bias, downforce, final drive, steering, ride height + presets Balanced / Grip / Drift / Sprint / Off-Road.
+- ✅ Garage: live stat bars with hover before/after ghosts and PR delta, Parts/Tuning sub-tabs, wallet display, stage pips.
+- ✅ Test-drive of locked cars from the garage (events disabled, selection unchanged, returns to the garage focused on that car).
+- ⬜ Off-Road Truck archetype + dedicated mesh (arrives with Red Mesa Canyon in Phase 3)
+- ⬜ Dyno / before-after graph view (bars with deltas ship now; graph is cosmetic)
 - ⬜ Extended cosmetics (secondary paint, body kits, spoilers, wheel size, tint, plates, decals)
-- ⬜ Per-drivetrain handling personality tuning pass (FWD/RWD/AWD)
-- ⬜ Test-drive from garage
+- ⬜ Per-drivetrain handling personality pass (FWD/RWD/AWD launch + throttle-steer differences)
 
 ## Phase 3 — Open-world expansion ⬜
 - ⬜ Remaining six districts as data files + district-specific builders (terrain heightmap for canyon/mountain)

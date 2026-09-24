@@ -255,14 +255,16 @@ class CarModel {
     // ─────────────────────────────────────────────
     // 2. MODEL-SPECIFIC EXTERIOR GEOMETRY
     // ─────────────────────────────────────────────
-    if (this.carId === 'v01_kairo_pulse_s') {
+    // Exterior builder is chosen by data (`bodyStyle`), falling back to the legacy id mapping
+    const style = carData.bodyStyle || ({ v01_kairo_pulse_s: 'hatch', veloce_v8_gt: 'gt', veloce_v12_stradale: 'hyper' }[this.carId]) || 'track';
+    if (style === 'hatch') {
       this.buildKairoPulseSExterior(carBody, length, width, height, halfLen, halfWid, noseHeight);
-    } else if (this.carId === 'veloce_v8_gt') {
+    } else if (style === 'gt') {
       this.buildV8GTExterior(carBody, length, width, height, halfLen, halfWid, noseHeight);
-    } else if (this.carId === 'veloce_v12_stradale') {
+    } else if (style === 'hyper') {
       this.buildV12StradaleExterior(carBody, length, width, height, halfLen, halfWid, noseHeight);
     } else {
-      // Default: Veloce V10 Corsa
+      // 'track': Veloce V10 Corsa silhouette
       this.buildV10CorsaExterior(carBody, length, width, height, halfLen, halfWid, noseHeight);
     }
 
@@ -913,7 +915,8 @@ class CarModel {
   // ==========================================================================
   buildCockpitInterior(carBody, length, width, height, halfLen, noseHeight) {
     const interiorMat = new THREE.MeshStandardMaterial({ color: 0x14161a, roughness: 0.82 });
-    const accentColor = this.carId === 'veloce_v8_gt' ? 0x00d8ff : (this.carId === 'veloce_v12_stradale' ? 0xffaa00 : 0xff1e38);
+    const carDef = (window.getCarById && window.getCarById(this.carId)) || {};
+    const accentColor = carDef.accentColor !== undefined ? carDef.accentColor : (this.carId === 'veloce_v8_gt' ? 0x00d8ff : (this.carId === 'veloce_v12_stradale' ? 0xffaa00 : 0xff1e38));
     const accentMat = new THREE.MeshStandardMaterial({ color: accentColor, roughness: 0.50 });
 
     const cabinZ = -0.06 * length;
@@ -1165,7 +1168,8 @@ class CarModel {
     wheelMesh.add(rim);
 
     // 3. Multi-Spoke Alloy Design
-    const spokeCount = this.carId === 'veloce_v12_stradale' ? 5 : (this.carId === 'veloce_v10_corsa' ? 6 : 8);
+    const carDefW = (window.getCarById && window.getCarById(this.carId)) || {};
+    const spokeCount = carDefW.spokeCount || (this.carId === 'veloce_v12_stradale' ? 5 : (this.carId === 'veloce_v10_corsa' ? 6 : 8));
     for (let i = 0; i < spokeCount; i++) {
       const angle = (i / spokeCount) * Math.PI * 2;
       const spokeGeom = new THREE.BoxGeometry(thickness * 0.96, 0.038, rimR * 0.94);

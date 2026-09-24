@@ -62,9 +62,16 @@ class WorkshopManager {
         <span id="ws-pr-value" style="font-family: 'Orbitron', sans-serif; font-size: 18px; font-weight: 900; color: #00f0ff;">680 PR</span>
       </div>
 
-      <!-- TAB 1: UPGRADES -->
-      <div id="ws-panel-upgrades" style="display: block; max-height: 380px; overflow-y: auto;">
+      <div id="ws-live-stats" class="ws-live-stats"></div>
+
+      <!-- TAB 1: UPGRADES (parts + tuning) -->
+      <div id="ws-panel-upgrades" style="display: block; overflow-y: auto;">
+        <div class="ws-subtabs">
+          <button id="ws-subtab-parts" class="ws-subtab active">PARTS</button>
+          <button id="ws-subtab-tuning" class="ws-subtab">TUNING</button>
+        </div>
         <div id="ws-upgrade-rows"></div>
+        <div id="ws-tuning-panel" style="display: none;"></div>
       </div>
 
       <!-- TAB 2: COSMETICS -->
@@ -304,6 +311,16 @@ class WorkshopManager {
         this.exitWorkshop();
       });
     }
+
+    const btnTest = document.getElementById('btn-test-drive');
+    if (btnTest) {
+      btnTest.addEventListener('click', () => {
+        const car = this.allCars[this.carIndex];
+        if (!car || !this.game.openWorld) return;
+        this.game.hideWorkshop();
+        this.game.enterFreeRoam({ carId: car.id, spawn: 'garage', testDrive: true });
+      });
+    }
   }
 
   bindTurntableEvents() {
@@ -348,7 +365,10 @@ class WorkshopManager {
     this.targetAeroProgress = 0.0;
     this.cameraPreset = 'ORBIT';
 
-    const selectedIdx = this.allCars.findIndex(c => c.id === this.selectedCarId);
+    // Focus the car the player just test-drove, otherwise the selected car
+    const focusId = this.focusCarId || this.selectedCarId;
+    this.focusCarId = null;
+    const selectedIdx = this.allCars.findIndex(c => c.id === focusId);
     this.carIndex = selectedIdx >= 0 ? selectedIdx : 0;
 
     this.spawnPlatform();
@@ -493,101 +513,162 @@ class WorkshopManager {
     if (prEl) prEl.textContent = prVal + ' PR';
 
     this.buildUpgradeRows(car);
+    this.buildTuningPanel(car);
+    this.bindSubtabs();
     this.buildCosmeticOptions();
     this.updateButtons();
     this.spawnPreviewCar(car.id);
   }
 
+  bindSubtabs() {
+    if (this._subtabsBound) return;
+    const parts = document.getElementById('ws-subtab-parts');
+    const tuning = document.getElementById('ws-subtab-tuning');
+    const partsPanel = document.getElementById('ws-upgrade-rows');
+    const tuningPanel = document.getElementById('ws-tuning-panel');
+    if (!parts || !tuning || !partsPanel || !tuningPanel) return;
+    const show = (which) => {
+      parts.classList.toggle('active', which === 'parts');
+      tuning.classList.toggle('active', which === 'tuning');
+      partsPanel.style.display = which === 'parts' ? 'block' : 'none';
+      tuningPanel.style.display = which === 'tuning' ? 'block' : 'none';
+    };
+    parts.addEventListener('click', () => show('parts'));
+    tuning.addEventListener('click', () => show('tuning'));
+    this._subtabsBound = true;
+  }
+
+  // ── Live stat bars (before/after) ────────────────────────────────────
+  updateStatBars(car, preview = null) {
+    const box = document.getElementById('ws-live-stats');
+    if (!box) return;
+    const us = window.UpgradeSystem;
+    const current = us ? us.getDisplayStats(car.id) : { topSpeed: car.stats.topSpeed, acceleration: car.stats.acceleration, handling: car.stats.handling, braking: car.stats.braking, grip: car.stats.grip, stability: car.stats.stability };
+    const next = preview && us ? us.getDisplayStats(car.id, preview) : null;
+    const rows = [['topSpeed', 'Top Speed'], ['acceleration', 'Acceleration'], ['handling', 'Handling'], ['braking', 'Braking'], ['grip', 'Grip'], ['stability', 'Stability']];
+    box.innerHTML = rows.map(([k, label]) => {
+      const cur = current[k]; const nv = next ? next[k] : cur; const d = nv - cur;
+      const deltaHtml = d === 0 ? '' : `<span class="ws-delta ${d > 0 ? 'up' : 'down'}">${d > 0 ? '+' : ''}${d}</span>`;
+      const ghost = next && d !== 0 ? `<div class="ws-bar-ghost ${d > 0 ? 'up' : 'down'}" style="left:${Math.min(cur, nv)}%; width:${Math.abs(d)}%"></div>` : '';
+      return `<div class="ws-stat"><span class="ws-stat-label">${label}</span><div class="ws-bar"><div class="ws-bar-fill" style="width:${cur}%"></div>${ghost}</div><span class="ws-stat-val">${nv}${deltaHtml}</span></div>`;
+    }).join('');
+    const prEl = document.getElementById('ws-pr-value');
+    if (prEl && us) {
+      const pr = us.calculatePR(car.id); const prNext = preview ? us.calculatePR(car.id, preview) : pr;
+      prEl.textContent = `${prNext} PR`;
+      prEl.style.color = prNext > pr ? '#7dff6a' : (prNext < pr ? '#ff6b6b' : '#00f0ff');
+    }
+  }
+
+  // ── Parts (8 categories × 5 stages, with trade-offs) ─────────────────
   buildUpgradeRows(car) {
     const container = document.getElementById('ws-upgrade-rows');
     if (!container) return;
-
-    const statsList = [
-      { key: 'acceleration', name: 'Acceleration', base: car.stats.acceleration },
-      { key: 'handling', name: 'Handling', base: car.stats.handling },
-      { key: 'braking', name: 'Braking', base: car.stats.braking },
-      { key: 'tireGrip', name: 'Tire Grip', base: car.stats.grip },
-      { key: 'nitroCapacity', name: 'Nitro Capacity', base: Math.round(car.physics.nitroCapacity * 0.75) },
-      { key: 'nitroEfficiency', name: 'Nitro Efficiency', base: 72 },
-      { key: 'landingStability', name: 'Stability', base: car.stats.stability }
-    ];
-
-    const installedUpgrades = window.SaveManager ? window.SaveManager.getUpgrades(car.id) : {};
+    const us = window.UpgradeSystem;
     const currentCash = window.SaveManager ? window.SaveManager.getCash() : 0;
+    const owned = window.SaveManager ? window.SaveManager.isCarUnlocked(car.id) : true;
 
     let html = `
-      <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255, 215, 0, 0.12); padding: 6px 12px; border-radius: 6px; border: 1px solid rgba(255, 215, 0, 0.3); margin-bottom: 10px;">
-        <span style="font-family: 'Orbitron', sans-serif; font-size: 11px; color: #d4a029;">WALLET BALANCE</span>
-        <span style="font-family: 'Orbitron', sans-serif; font-size: 16px; font-weight: 900; color: #ffd700;">₡ ${currentCash.toLocaleString()}</span>
-      </div>
-    `;
+      <div class="ws-wallet"><span>WALLET BALANCE</span><span>₡ ${currentCash.toLocaleString()}</span></div>`;
+    if (!us) { container.innerHTML = html + '<div class="ws-note">Upgrade system unavailable.</div>'; return; }
+    if (!owned) html += `<div class="ws-note">Purchase the ${car.name} to install parts. Stock performance is shown above.</div>`;
 
-    statsList.forEach(stat => {
-      const level = installedUpgrades[stat.key] || 0;
-      const boostedVal = Math.min(100, Math.round(stat.base + (level * 2.5)));
-      const isMax = level >= 10;
-      const cost = window.SaveManager ? window.SaveManager.getUpgradeCost(car.id, stat.key) : null;
-      const canAfford = cost !== null && currentCash >= cost;
-
-      let btnLabel, btnBg, btnColor, btnCursor, btnDisabled;
-      if (isMax) {
-        btnLabel = 'MAX';
-        btnBg = 'rgba(255,255,255,0.08)';
-        btnColor = '#666';
-        btnCursor = 'default';
-        btnDisabled = 'disabled';
-      } else if (!canAfford) {
-        btnLabel = `₡${cost}`;
-        btnBg = 'rgba(255,100,100,0.15)';
-        btnColor = '#ff6666';
-        btnCursor = 'not-allowed';
-        btnDisabled = 'disabled';
+    const parts = us.getParts(car.id);
+    us.catalog.categories.forEach((cat) => {
+      const stage = parts[cat.id];
+      const next = us.getNextStage(car.id, cat.id);
+      const cost = us.getNextStageCost(car.id, cat.id);
+      const pips = cat.stages.map((st, i) => `<span class="ws-pip ${i < stage ? 'on' : ''}" title="Stage ${i + 1}: ${st.name}"></span>`).join('');
+      const installedName = stage > 0 ? cat.stages[stage - 1].name : 'Stock';
+      let effectsHtml = '';
+      let btn;
+      if (!next) {
+        btn = `<button class="ws-install" disabled>MAX</button>`;
       } else {
-        btnLabel = `▲ ₡${cost}`;
-        btnBg = '#00f0ff';
-        btnColor = '#0a0e17';
-        btnCursor = 'pointer';
-        btnDisabled = '';
+        const eff = window.UpgradeSystem.constructor.describeEffects(next.effects);
+        effectsHtml = eff.map((e) => `<span class="ws-eff ${e.good ? 'good' : 'bad'}">${e.label} ${e.value}</span>`).join('');
+        const afford = owned && currentCash >= cost;
+        btn = `<button class="ws-install ${afford ? 'ok' : 'no'}" data-cat="${cat.id}" ${afford ? '' : 'disabled'} title="${next.name}">${afford ? 'INSTALL' : (owned ? 'NEED' : 'LOCKED')} ₡${cost.toLocaleString()}</button>`;
       }
-
       html += `
-        <div class="stat-row" style="margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between;">
-          <div style="width: 105px;">
-            <div style="font-size: 11px; font-weight: 600; color: #fff;">${stat.name}</div>
-            <div style="font-size: 9px; color: #00d8ff; font-family: monospace;">LVL ${level}/10</div>
+        <div class="ws-part" data-cat="${cat.id}">
+          <div class="ws-part-head">
+            <span class="ws-part-icon">${cat.icon}</span>
+            <div class="ws-part-title"><div>${cat.name}</div><div class="ws-part-sub">${installedName}${next ? ` → <b>${next.name}</b>` : ' · fully built'}</div></div>
+            <div class="ws-pips">${pips}</div>
           </div>
-
-          <div style="flex: 1; margin: 0 10px; height: 8px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden; position: relative;">
-            <div style="height: 100%; width: ${boostedVal}%; background: linear-gradient(90deg, #0088ff, #00f0ff); border-radius: 4px; transition: width 0.3s ease;"></div>
+          <div class="ws-part-body">
+            <div class="ws-effects">${effectsHtml || `<span class="ws-eff neutral">${cat.blurb}</span>`}</div>
+            ${btn}
           </div>
-
-          <span style="width: 28px; font-size: 11px; font-family: monospace; text-align: right; color: #fff;">${boostedVal}</span>
-
-          <button class="ws-upgrade-btn" data-key="${stat.key}" ${btnDisabled} style="margin-left: 8px; padding: 3px 8px; font-size: 10px; font-weight: 700; background: ${btnBg}; color: ${btnColor}; border: none; border-radius: 3px; cursor: ${btnCursor}; min-width: 55px; transition: all 0.2s ease;">
-            ${btnLabel}
-          </button>
-        </div>
-      `;
+        </div>`;
     });
-
     container.innerHTML = html;
 
-    container.querySelectorAll('.ws-upgrade-btn').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        const key = e.currentTarget.getAttribute('data-key');
-        if (window.SaveManager) {
-          const result = window.SaveManager.upgradeStat(car.id, key);
-          if (result === -1) {
-            e.currentTarget.style.background = '#ff3333';
-            e.currentTarget.textContent = 'NO CASH!';
-            setTimeout(() => this.updateUI(), 800);
-          } else {
-            this.updateUI();
-            if (window.SoundEngine) window.SoundEngine.playBeep(true);
-          }
+    container.querySelectorAll('.ws-install[data-cat]').forEach((btn) => {
+      const cat = btn.getAttribute('data-cat');
+      btn.addEventListener('mouseenter', () => this.updateStatBars(car, { previewCategory: cat }));
+      btn.addEventListener('mouseleave', () => this.updateStatBars(car));
+      btn.addEventListener('click', () => {
+        const result = us.install(car.id, cat);
+        if (result === 'ok') {
+          if (window.SoundEngine) window.SoundEngine.playBeep(true);
+          this.updateUI();
+        } else if (result === 'no_cash') {
+          btn.textContent = 'NO CASH!'; btn.classList.add('no');
+          setTimeout(() => this.updateUI(), 800);
         }
       });
     });
+    this.updateStatBars(car);
+  }
+
+  // ── Tuning sliders & presets ─────────────────────────────────────────
+  buildTuningPanel(car) {
+    const panel = document.getElementById('ws-tuning-panel');
+    if (!panel) return;
+    const us = window.UpgradeSystem;
+    if (!us) { panel.innerHTML = '<div class="ws-note">Tuning unavailable.</div>'; return; }
+    const tuning = us.getTuning(car.id);
+    const active = us.activePresetId(car.id);
+    let html = `<div class="ws-presets">${us.presets.map((p) => `<button class="ws-preset ${active === p.id ? 'active' : ''}" data-preset="${p.id}">${p.name}</button>`).join('')}</div>`;
+    us.sliders.forEach((sl) => {
+      html += `
+        <div class="ws-slider" title="${sl.hint}">
+          <div class="ws-slider-head"><span>${sl.name}</span><span class="ws-slider-val" id="ws-tune-val-${sl.id}">${WorkshopManager.fmtTune(tuning[sl.id])}</span></div>
+          <div class="ws-slider-row"><span class="ws-slider-end">${sl.left}</span><input type="range" min="${sl.min}" max="${sl.max}" step="0.05" value="${tuning[sl.id]}" data-slider="${sl.id}"><span class="ws-slider-end">${sl.right}</span></div>
+          <div class="ws-slider-hint">${sl.hint}</div>
+        </div>`;
+    });
+    html += `<div class="ws-note">Tuning is free and applies the next time you drive. Hover a slider to preview its effect on the stats above.</div>`;
+    panel.innerHTML = html;
+
+    panel.querySelectorAll('.ws-preset').forEach((b) => b.addEventListener('click', () => {
+      us.applyPreset(car.id, b.getAttribute('data-preset'));
+      if (window.SoundEngine) window.SoundEngine.playBeep(false);
+      this.buildTuningPanel(car);
+      this.updateStatBars(car);
+    }));
+    panel.querySelectorAll('input[data-slider]').forEach((inp) => {
+      const id = inp.getAttribute('data-slider');
+      const preview = () => {
+        const v = parseFloat(inp.value);
+        const valEl = document.getElementById(`ws-tune-val-${id}`);
+        if (valEl) valEl.textContent = WorkshopManager.fmtTune(v);
+        this.updateStatBars(car, { tuning: { [id]: v } });
+      };
+      inp.addEventListener('input', preview);
+      inp.addEventListener('change', () => {
+        us.setTuning(car.id, { [id]: parseFloat(inp.value) });
+        panel.querySelectorAll('.ws-preset').forEach((b) => b.classList.toggle('active', b.getAttribute('data-preset') === us.activePresetId(car.id)));
+        this.updateStatBars(car);
+      });
+    });
+  }
+
+  static fmtTune(v) {
+    if (Math.abs(v) < 0.025) return 'STOCK';
+    return `${v > 0 ? '+' : ''}${Math.round(v * 100)}`;
   }
 
   buildCosmeticOptions() {
@@ -712,6 +793,11 @@ class WorkshopManager {
     const btnSelect = document.getElementById('btn-select-car');
     const btnStart = document.getElementById('btn-start-race');
     const isUnlocked = window.SaveManager ? window.SaveManager.isCarUnlocked(car.id) : true;
+
+    const btnTest = document.getElementById('btn-test-drive');
+    if (btnTest) btnTest.classList.toggle('hidden', isUnlocked || !this.game.openWorld);
+    const btnDrive = document.getElementById('btn-ws-drive');
+    if (btnDrive) btnDrive.disabled = !isUnlocked && !this.game.openWorld;
 
     if (btnSelect && btnStart) {
       if (!isUnlocked) {

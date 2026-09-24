@@ -68,16 +68,48 @@ full map with filters; exploration rewarded (discovery points give credits + rep
 
 ## 5. Vehicles
 
-Fictional manufacturers: **Kinetix Dynamics**, **Veloce Performance**, **Ordnance Hero Works**
-(existing), plus **Kairo**, **Voltrix**, **Radian**, **Monarch**, **Apex Forge** (planned).
+Fictional manufacturers (all in-game as of v0.3.0): **Kinetix Dynamics**, **Veloce Performance**,
+**Ordnance Hero Works**, **Radian Motors**, **Veyra Automotive**, **Monarch Motorworks**,
+**Voltrix Dynamics**, **Apex Forge**.
 
-Target roster (8 archetypes): Beginner Street, Compact Tuner, Muscle, Drift Coupe, Rally Hatch,
-Off-Road Truck, Supercar, Hypercar. Existing cars map to: Kairo Pulse S (Compact Tuner /
-starter), V8 GT (Muscle-GT), V10 Corsa (Supercar), V12 Stradale & Bujji (Hypercar).
+| Car | Maker | Archetype | Drive | Price | Personality |
+| --- | --- | --- | --- | --- | --- |
+| Kairo Pulse S | Kinetix | Compact Tuner (starter) | FWD | free | forgiving, nimble, low top end |
+| Veloce V10 Corsa | Veloce | Supercar | RWD | free | balanced all-rounder |
+| Radian Sprint 4 | Radian | Rally Hatch | AWD | 9,000 | launches hard, unbothered by kerbs/dirt |
+| Veyra Corsair | Veyra | Drift Coupe | RWD | 12,000 | quick rack, loose rear, low stability |
+| Veloce V8 GT | Veloce | Grand Tourer | RWD | — | heavy, stable, strong brakes |
+| Monarch Sovereign GT | Monarch | Muscle GT | RWD | 22,000 | huge straight-line pace, lazy turn-in |
+| Voltrix Ion | Voltrix | Electric Sport | AWD | 28,000 | instant torque, heaviest car, silent whine |
+| Veloce V12 Stradale | Veloce | Hypercar | AWD | — | high downforce, sharp |
+| Apex Forge Halo | Apex Forge | Hypercar (flagship) | AWD | 80,000 | best at everything — the end-game goal |
+| Bujji | Ordnance Hero Works | Armoured hyper | AWD | — | showcase model |
 
-Each car is defined in `CarDatabase` with dimensions, engine, drivetrain, stats, physics profile,
-audio profile and anchors. Personality comes from mass, drivetrain, power curve, grip balance and
-drift multiplier — never just "bigger numbers".
+Still to add: Off-Road Truck (with Red Mesa Canyon). Each car is a `CarDatabase` entry with dimensions,
+engine, drivetrain, stats, physics profile, audio profile, anchors and a procedural `bodyStyle`.
+Personality comes from mass, drivetrain, power, grip balance and drift multiplier — never just
+"bigger numbers".
+
+### Parts (8 categories × 5 stages, with trade-offs)
+
+| Category | Stages | Gains | Costs |
+| --- | --- | --- | --- |
+| Engine | ECU Remap → Intake & Exhaust → Hybrid Turbo → Forged Bottom End → Race Engine | power, top speed | a little mass |
+| Drivetrain | Sport Clutch → Short-Shift Kit → Limited-Slip Diff → Carbon Driveshaft → Sequential Gearbox | traction (grip), power delivery | — |
+| Tyres | Sport Compound → Semi-Slicks → Track Slicks → Race Compound → Adaptive Compound | grip, braking | driftability, a touch of top speed |
+| Brakes | Performance Pads → Slotted Discs → Big Brake Kit → Carbon-Ceramic → Race ABS Module | braking, stability | small mass |
+| Suspension | Lowering Springs → Sport Dampers → Coilovers → Anti-Roll Kit → Race Suspension | handling, stability | rough-surface grip |
+| Aero | Front Splitter → Rear Spoiler → Flat Underbody → GT Wing → Active Aero Kit | grip at speed, stability | drag (top speed) |
+| Weight Reduction | Lightweight Wheels → Carbon Panels → Interior Delete → Polycarbonate Glass → Carbon Tub | everything via mass | stability |
+| Nitro | Wet Kit → Twin Bottles → Direct Port → Progressive Controller → Overdrive Cell | tank, efficiency, hit | — |
+
+Cost per stage = base (₡1,200 → ₡10,500) × category weight × car tier factor. A fully built starter costs
+about ₡110k, the Halo about ₡240k — earned only through driving, never bought with real money.
+
+### Tuning (free, per car)
+
+Brake bias, downforce, final drive, steering, ride height (−1…+1), plus presets Balanced / Grip / Drift /
+Sprint / Off-Road. Tuning is shown live on the garage stat bars so trade-offs are obvious before driving.
 
 ## 6. Driving model (open world)
 

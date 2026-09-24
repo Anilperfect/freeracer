@@ -63,6 +63,10 @@
       veloce_v12_stradale: { color: '#d4dae0', finish: 'chrome', rimFinish: 'forged_gold', underglowColor: '#ffaa00', nitroFlameColor: '#cc00ff' },
       falcon_s1: { color: '#e61a2b', finish: 'metallic', rimFinish: 'silver_chrome', underglowColor: '#00f0ff', nitroFlameColor: '#00f0ff' }
     },
+    // Part-based upgrades & tuning (Phase 2) — carId → { engine: stage, … } / { brakeBias, … }
+    parts: {},
+    tuning: {},
+    partsMigrated: false,
     // Open-world progression (FreeRacer)
     progress: {
       reputation: 0,
@@ -121,6 +125,8 @@
         upgrades: { ...clone(d.upgrades), ...(parsed.upgrades || {}) },
         cosmetics: { ...clone(d.cosmetics), ...(parsed.cosmetics || {}) },
         bestTimes: { ...clone(d.bestTimes), ...(parsed.bestTimes || {}) },
+        parts: { ...(parsed.parts || {}) },
+        tuning: { ...(parsed.tuning || {}) },
         progress: { ...clone(d.progress), ...(parsed.progress || {}) },
         settings: { ...clone(d.settings), ...(parsed.settings || {}) }
       };
@@ -301,6 +307,7 @@
     }
 
     calculatePR(carId) {
+      if (window.UpgradeSystem) return window.UpgradeSystem.calculatePR(carId);
       const baseCar = window.getCarById(carId);
       if (!baseCar) return 500;
       const upgrades = this.getUpgrades(carId);
