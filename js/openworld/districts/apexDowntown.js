@@ -78,6 +78,7 @@
     // Player garage — building footprint + entry trigger.
     garage: {
       name: 'Apex Plaza Garage',
+      sign: 'APEX GARAGE',
       building: { x: 84, z: -84, width: 70, depth: 52, height: 14, yaw: 0 },
       entry: { x: 84, z: -40, radius: 9 },
       spawn: { x: 60, z: -22, yaw: Math.PI * 0.5 } // facing +X along Meridian Blvd
@@ -111,6 +112,14 @@
     ramps: [
       { x: -60, z: -110, yaw: 0, length: 22, width: 8, height: 3.2, name: 'Plaza Kicker' },
       { x: 60, z: 110, yaw: Math.PI, length: 22, width: 8, height: 3.2, name: 'Plaza Kicker South' }
+    ],
+
+    // Neon caches (collectibles): small pickups worth credits.
+    caches: [
+      { id: 'ad_cache_1', name: 'Plaza Cache', x: 120, z: 120, credits: 400 },
+      { id: 'ad_cache_2', name: 'Arena Cache', x: -320, z: -60, credits: 500 },
+      { id: 'ad_cache_3', name: 'Waterfront Cache', x: 240, z: 470, credits: 500 },
+      { id: 'ad_cache_4', name: 'Gate Cache', x: -120, z: -480, credits: 400 }
     ],
 
     trafficDensity: 1.0,

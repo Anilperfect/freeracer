@@ -2138,3 +2138,53 @@ html, body {
 .ws-slider-end:last-child { text-align: right; }
 .ws-slider-row input[type=range] { flex: 1; accent-color: #00f0ff; cursor: pointer; }
 .ws-slider-hint { font-family: 'Rajdhani', sans-serif; font-size: 11px; color: #667788; margin-top: 4px; }
+
+/* ── v0.6.1: settings sections + remappable controls ─────────────────────── */
+.settings-card { max-height: 92vh; overflow-y: auto; }
+.settings-section {
+  font-family: 'Orbitron', sans-serif; font-size: 0.75rem; letter-spacing: 3px;
+  color: #00f0ff; border-bottom: 1px solid rgba(0, 240, 255, 0.25);
+  padding-bottom: 6px; margin-top: 4px;
+}
+#settings-controls-list { display: flex; flex-direction: column; gap: 6px; }
+.fr-key-row { display: flex; align-items: center; gap: 8px; }
+.fr-key-label { flex: 1; font-size: 0.85rem; color: #c0d0e0; font-weight: 600; }
+.fr-key-btn {
+  min-width: 110px; padding: 5px 10px; font-family: 'Rajdhani', sans-serif; font-weight: 700;
+  font-size: 0.8rem; letter-spacing: 1px; color: #fff; background: #111726;
+  border: 1px solid rgba(0, 240, 255, 0.3); border-radius: 4px; cursor: pointer;
+}
+.fr-key-btn:hover { border-color: #00f0ff; background: rgba(0, 240, 255, 0.12); }
+.fr-key-btn.listening { border-color: #ffd700; color: #ffd700; animation: fr-key-pulse 0.8s infinite alternate; }
+@keyframes fr-key-pulse { from { background: rgba(255, 215, 0, 0.08); } to { background: rgba(255, 215, 0, 0.25); } }
+.settings-controls-note { font-size: 0.8rem; color: #ffd700; min-height: 1.2em; }
+
+/* ── v0.6.1: open-world subtitles, travel row, gamepad focus ─────────────── */
+.ow-subtitles {
+  position: absolute; left: 50%; bottom: 96px; transform: translateX(-50%);
+  max-width: 70%; padding: 8px 18px; text-align: center;
+  font-family: 'Rajdhani', sans-serif; font-size: 1.05rem; font-weight: 600; letter-spacing: 1px;
+  color: #fff; background: rgba(5, 7, 15, 0.78); border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.14); pointer-events: none;
+}
+.ow-travel-label { flex: 1.4 !important; }
+.ow-travel-row { display: flex; gap: 8px; }
+.ow-travel-row select { flex: 1; min-width: 0; }
+.ow-travel-row .ws-btn { padding: 8px 14px; white-space: nowrap; }
+.ws-btn.gp-focus, .fr-key-btn.gp-focus {
+  outline: 2px solid #ffd700; outline-offset: 2px;
+  box-shadow: 0 0 14px rgba(255, 215, 0, 0.55);
+}
+
+/* ── v0.6.1: accessibility ───────────────────────────────────────────────── */
+body.fr-reduce-motion .ow-checkpoint-flash,
+body.fr-reduce-motion #countdown-text,
+body.fr-reduce-motion .ow-toast,
+body.fr-reduce-motion .fr-key-btn.listening { animation-duration: 0.01s !important; }
+body.fr-reduce-motion .ow-cp-arrow { transition: none !important; }
+body.fr-high-contrast .ow-event-panel,
+body.fr-high-contrast .ow-prompt,
+body.fr-high-contrast .ow-subtitles { background: rgba(0, 0, 0, 0.92); border-color: #fff; }
+body.fr-high-contrast .ow-event-panel,
+body.fr-high-contrast .ow-prompt-text,
+body.fr-high-contrast .ow-subtitles { color: #fff; }

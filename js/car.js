@@ -263,10 +263,15 @@ class CarModel {
       this.buildV8GTExterior(carBody, length, width, height, halfLen, halfWid, noseHeight);
     } else if (style === 'hyper') {
       this.buildV12StradaleExterior(carBody, length, width, height, halfLen, halfWid, noseHeight);
+    } else if (style === 'truck') {
+      this.buildTruckExterior(carBody, length, width, height, halfLen, halfWid, noseHeight);
     } else {
       // 'track': Veloce V10 Corsa silhouette
       this.buildV10CorsaExterior(carBody, length, width, height, halfLen, halfWid, noseHeight);
     }
+
+    // Bolt-on spoiler options (CUSTOMIZE tab; hidden unless selected)
+    this.buildSpoilerOption(carBody, length, width, height, halfLen);
 
     // ─────────────────────────────────────────────
     // 3. COCKPIT INTERIOR (LOD 0 & LOD 1)
@@ -305,6 +310,135 @@ class CarModel {
     this.group.add(this.wheelFR.pivot);
     this.group.add(this.wheelRL.pivot);
     this.group.add(this.wheelRR.pivot);
+  }
+
+  // ==========================================================================
+  // BODY STYLE: OFF-ROAD TRUCK (Ironclad Ridgeback)
+  // ==========================================================================
+  buildTruckExterior(carBody, length, width, height, halfLen, halfWid, noseHeight) {
+    const hoodLen = length * 0.24;
+    const cabLen = length * 0.28;
+    const cabZ = halfLen - hoodLen - cabLen * 0.5;
+    const bedLen = length - hoodLen - cabLen - 0.35;
+    const bedZ = -halfLen + 0.35 + bedLen * 0.5;
+    const beltY = 0.46;
+    const box = (w, h, d, mat, x, y, z, shadow = true) => {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+      m.position.set(x, y, z);
+      m.castShadow = shadow;
+      m.receiveShadow = true;
+      carBody.add(m);
+      return m;
+    };
+
+    // Tall hood + grille + skid plate + bull bar
+    box(width * 0.86, 0.30, hoodLen, this.bodyMat, 0, beltY + 0.06, halfLen - hoodLen * 0.5 - 0.12);
+    box(width * 0.80, 0.22, 0.10, this.carbonMat, 0, beltY - 0.02, halfLen - 0.10); // grille
+    box(width * 0.70, 0.06, 0.55, this.chromeMat, 0, 0.10, halfLen - 0.38);       // skid plate
+    box(width * 0.92, 0.24, 0.24, this.carbonMat, 0, 0.26, halfLen - 0.06);       // bumper
+    [-1, 1].forEach((s) => box(0.09, 0.52, 0.09, this.carbonMat, s * width * 0.26, 0.56, halfLen + 0.10));
+    box(width * 0.62, 0.09, 0.09, this.carbonMat, 0, 0.80, halfLen + 0.10);       // bull-bar crossbar
+
+    // Headlight guards (light motif)
+    [-1, 1].forEach((side) => {
+      const lamp = new THREE.Mesh(new THREE.BoxGeometry(width * 0.16, 0.10, 0.06),
+        new THREE.MeshBasicMaterial({ color: 0xd8f4ff }));
+      lamp.position.set(side * width * 0.32, beltY + 0.02, halfLen - 0.045);
+      carBody.add(lamp);
+    });
+
+    // Crew cab + glasshouse + roof + rack + light bar
+    box(width * 0.80, 0.62, cabLen, this.bodyMat, 0, beltY + 0.27, cabZ);
+    const shield = new THREE.Mesh(new THREE.PlaneGeometry(width * 0.70, 0.46), this.glassMat);
+    shield.position.set(0, beltY + 0.52, cabZ + cabLen * 0.5 + 0.03);
+    shield.rotation.x = -0.28;
+    carBody.add(shield);
+    const rearGlass = new THREE.Mesh(new THREE.PlaneGeometry(width * 0.66, 0.40), this.glassMat);
+    rearGlass.position.set(0, beltY + 0.50, cabZ - cabLen * 0.5 - 0.01);
+    rearGlass.rotation.y = Math.PI;
+    carBody.add(rearGlass);
+    [-1, 1].forEach((side) => {
+      const sg = new THREE.Mesh(new THREE.PlaneGeometry(cabLen * 0.78, 0.38), this.glassMat);
+      sg.position.set(side * (width * 0.405), beltY + 0.50, cabZ);
+      sg.rotation.y = side * Math.PI * 0.5;
+      carBody.add(sg);
+    });
+    box(width * 0.82, 0.08, cabLen + 0.12, this.bodyMat, 0, beltY + 0.62, cabZ);   // roof
+    box(width * 0.68, 0.07, cabLen * 0.78, this.carbonMat, 0, beltY + 0.70, cabZ); // rack tray
+    const lightBar = new THREE.Mesh(new THREE.BoxGeometry(width * 0.52, 0.09, 0.12),
+      new THREE.MeshBasicMaterial({ color: 0xfff2cc }));
+    lightBar.position.set(0, beltY + 0.78, cabZ + cabLen * 0.28);
+    carBody.add(lightBar);
+
+    // Bed: floor + side walls + tailgate + spare wheel
+    box(width * 0.84, 0.08, bedLen, this.carbonMat, 0, beltY - 0.02, bedZ);
+    [-1, 1].forEach((side) => box(0.09, 0.34, bedLen, this.bodyMat, side * (width * 0.40), beltY + 0.15, bedZ));
+    box(width * 0.84, 0.34, 0.09, this.bodyMat, 0, beltY + 0.15, bedZ - bedLen * 0.5 + 0.045);
+    const spare = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.34, 0.22, 18), this.tireMat);
+    spare.rotation.x = Math.PI * 0.5;
+    spare.position.set(0, beltY + 0.28, bedZ - bedLen * 0.5 + 0.62);
+    spare.castShadow = true;
+    carBody.add(spare);
+
+    // Snorkel on the right A-pillar
+    box(0.10, 0.72, 0.10, this.carbonMat, width * 0.38, beltY + 0.35, cabZ + cabLen * 0.5 - 0.12);
+
+    // Big flared arches + side steps + mud flaps
+    const halfBase = (this.config.dimensions.wheelbase || 3.0) * 0.5;
+    [-1, 1].forEach((side) => {
+      [halfBase, -halfBase].forEach((z) => {
+        const archGeom = new THREE.CylinderGeometry(0.52, 0.52, width * 0.13, 18, 1, false, 0, Math.PI);
+        archGeom.rotateZ(Math.PI * 0.5);
+        const arch = new THREE.Mesh(archGeom, this.bodyMat);
+        arch.position.set(side * (halfWid - 0.02), 0.10, z);
+        arch.castShadow = true;
+        carBody.add(arch);
+      });
+      box(0.20, 0.08, cabLen * 0.9, this.carbonMat, side * (halfWid + 0.06), 0.10, cabZ); // side step
+      box(0.26, 0.30, 0.05, this.carbonMat, side * (halfWid - 0.10), 0.02, -halfBase - 0.55, false); // mud flap
+    });
+  }
+
+  // ==========================================================================
+  // BOLT-ON SPOILER OPTIONS (all body styles; hidden unless selected)
+  // ==========================================================================
+  buildSpoilerOption(carBody, length, width, height, halfLen) {
+    const deckY = height * 0.52;
+    const tailZ = -halfLen + 0.55;
+    this.spoilerGroup = new THREE.Group();
+    const mkWing = (scale, lift, endplates) => {
+      const g = new THREE.Group();
+      const blade = new THREE.Mesh(new THREE.BoxGeometry(width * 0.72 * scale, 0.07, 0.42 * scale), this.carbonMat);
+      blade.position.set(0, deckY + lift, tailZ);
+      blade.castShadow = true;
+      g.add(blade);
+      const mH = 0.34 + lift;
+      [-1, 1].forEach((s) => {
+        const m = new THREE.Mesh(new THREE.BoxGeometry(0.09, mH, 0.30), this.carbonMat);
+        m.position.set(s * width * 0.28 * scale, deckY + lift - mH * 0.5 + 0.03, tailZ);
+        g.add(m);
+      });
+      if (endplates) {
+        [-1, 1].forEach((s) => {
+          const ep = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.30, 0.52 * scale), this.carbonMat);
+          ep.position.set(s * width * 0.36 * scale, deckY + lift + 0.06, tailZ);
+          g.add(ep);
+        });
+      }
+      return g;
+    };
+    this.sportWing = mkWing(1.0, 0.10, false);
+    this.gtWing = mkWing(1.28, 0.30, true);
+    this.spoilerGroup.add(this.sportWing, this.gtWing);
+    carBody.add(this.spoilerGroup);
+    this.applySpoiler(this.customSpoiler || 'none');
+  }
+
+  applySpoiler(style) {
+    if (!this.spoilerGroup) return;
+    if (this.sportWing) this.sportWing.visible = style === 'sport';
+    if (this.gtWing) this.gtWing.visible = style === 'gt';
+    this.spoilerGroup.visible = style === 'sport' || style === 'gt';
   }
 
   // ==========================================================================
@@ -1411,6 +1545,26 @@ class CarModel {
     if (flame !== undefined) {
       this.customLighting.nitroFlameColor = flame;
       if (this.flameMat) this.flameMat.color.set(flame);
+    }
+    // Extended cosmetics (Phase 2 completion): secondary trim, calipers, tint, spoiler.
+    if (options.secondaryColor !== undefined) {
+      this.customPaint.secondaryColor = options.secondaryColor;
+      if (this.carbonMat) this.carbonMat.color.set(options.secondaryColor);
+    }
+    if (options.caliperColor !== undefined) {
+      this.customWheels.caliperColor = options.caliperColor;
+      if (this.caliperMat) this.caliperMat.color.set(options.caliperColor);
+    }
+    if (options.windowTint !== undefined) {
+      let t = Number(options.windowTint);
+      if (t > 1) t = t / 100;
+      t = THREE.MathUtils.clamp(t || 0, 0, 1);
+      this.customTint = t;
+      if (this.glassMat) this.glassMat.opacity = 0.62 + t * 0.33;
+    }
+    if (options.spoiler !== undefined) {
+      this.customSpoiler = options.spoiler;
+      this.applySpoiler(options.spoiler);
     }
   }
 

@@ -333,7 +333,7 @@
       return false;
     }
 
-    /** 'asphalt' | 'plaza' | 'sidewalk' | 'boardwalk' | 'offroad' */
+    /** 'asphalt' | 'plaza' | 'sidewalk' | 'boardwalk' | 'sand' | 'offroad' */
     surfaceAt(x, z) {
       const d = this.district;
       const p = d.plaza;
@@ -341,6 +341,7 @@
       if (surf.type === 'asphalt') return 'asphalt';
       if (p && x >= p.minX && x <= p.maxX && z >= p.minZ && z <= p.maxZ) return 'plaza';
       if (d.waterfront && z >= d.waterfront.boardwalkFrom) return 'boardwalk';
+      if (d.beach && z >= d.beach.from) return 'sand';
       if (this.isOnSlab(x, z)) return 'sidewalk';
       return 'offroad';
     }
@@ -467,9 +468,10 @@
 
     buildGroundAndWater() {
       const b = this.district.bounds;
+      const theme = this.district.theme || {};
       const ground = new THREE.Mesh(
         new THREE.PlaneGeometry(4000, 4000),
-        new THREE.MeshStandardMaterial({ color: 0x14171d, roughness: 1.0, metalness: 0.0 })
+        new THREE.MeshStandardMaterial({ color: theme.ground !== undefined ? theme.ground : 0x14171d, roughness: 1.0, metalness: 0.0 })
       );
       ground.rotation.x = -Math.PI * 0.5;
       ground.position.y = -0.05;
@@ -499,6 +501,15 @@
         curb.addQuad([b.minX, 0, this.district.waterfront.boardwalkFrom], [b.maxX, 0, this.district.waterfront.boardwalkFrom],
           [b.maxX, 0.12, this.district.waterfront.boardwalkFrom], [b.minX, 0.12, this.district.waterfront.boardwalkFrom], [0, 0, -1], undefined, [0.9, 0.9, 0.9]);
         this.slabs.push({ x0: b.minX, z0: this.district.waterfront.boardwalkFrom, x1: b.maxX, z1: wz });
+      }
+
+      // Sandy beach apron (coastal districts): a sand-tinted floor just above
+      // the ground plane so roads/markings still render on top of it.
+      if (this.district.beach) {
+        const from = this.district.beach.from;
+        const to = this.district.waterfront ? this.district.waterfront.boardwalkFrom : b.maxZ;
+        const sand = this.batch('paving');
+        sand.addFloor(b.minX, from, b.maxX, to, -0.02, 4, [0.92, 0.78, 0.55]);
       }
     }
 
@@ -623,11 +634,12 @@
 
       // Outer fringe blocks (visual depth beyond the loop)
       const b = this.district.bounds;
-      const ring = 480 + 11.3 + 0.35;
+      const gridMax = Math.max(Math.abs(G[0]), Math.abs(G[G.length - 1]));
+      const ring = gridMax + 11.3 + 0.35;
       const fringe = [
         { x0: b.minX + 4, z0: b.minZ + 4, x1: b.maxX - 4, z1: -ring },          // north
-        { x0: b.minX + 4, z0: -ring, x1: -ring, z1: 480 + 11.3 },                 // west
-        { x0: ring, z0: -ring, x1: b.maxX - 4, z1: 480 + 11.3 }                   // east
+        { x0: b.minX + 4, z0: -ring, x1: -ring, z1: gridMax + 11.3 },            // west
+        { x0: ring, z0: -ring, x1: b.maxX - 4, z1: gridMax + 11.3 }              // east
       ];
       fringe.forEach((z) => {
         this.addSlab(z.x0, z.z0, z.x1, z.z1, 'paving');
@@ -651,6 +663,8 @@
     /** Sub-divides a zone into merged lots and raises buildings on them. */
     fillZone(zone, isFringe) {
       const rng = this.rng;
+      const theme = this.district.theme || {};
+      const density = theme.density !== undefined ? theme.density : 1;
       const w = zone.x1 - zone.x0;
       const d = zone.z1 - zone.z0;
       if (w < 12 || d < 12) return;
@@ -679,6 +693,9 @@
             continue;
           }
 
+          // Themed districts can thin out buildings (RNG untouched at density 1).
+          if (!isFringe && density < 1 && rng() > density) continue;
+
           const gap = 1.5 + rng() * 2.5;
           const x0 = zone.x0 + ix * cw + gap;
           const z0 = zone.z0 + iz * cd + gap;
@@ -692,6 +709,17 @@
     }
 
     overlapsLandmark(x0, z0, x1, z1) {
+      // Garage building + forecourt stay clear of procedural buildings.
+      const gb = this.district.garage && this.district.garage.building;
+      if (gb) {
+        const hx = gb.width * 0.5 + 4; const hz = gb.depth * 0.5 + 4;
+        if (x1 > gb.x - hx && x0 < gb.x + hx && z1 > gb.z - hz && z0 < gb.z + hz) return true;
+      }
+      const ge = this.district.garage && this.district.garage.entry;
+      if (ge) {
+        const r = (ge.radius || 9) + 14;
+        if (x1 > ge.x - r && x0 < ge.x + r && z1 > ge.z - r && z0 < ge.z + r) return true;
+      }
       const lms = this.district.landmarks || [];
       for (let i = 0; i < lms.length; i++) {
         const l = lms[i];
@@ -701,6 +729,10 @@
         } else if (l.type === 'stadium') {
           const hx = l.rx + 8; const hz = l.rz + 8;
           if (x1 > l.x - hx && x0 < l.x + hx && z1 > l.z - hz && z0 < l.z + hz) return true;
+        } else if (l.type === 'containers') {
+          const hx = ((l.cols || 5) - 1) * (l.gap || 16) * 0.5 + 10;
+          const hz = ((l.rows || 3) - 1) * (l.gap || 16) * 0.5 + 6;
+          if (x1 > l.x - hx && x0 < l.x + hx && z1 > l.z - hz && z0 < l.z + hz) return true;
         }
       }
       return false;
@@ -708,12 +740,14 @@
 
     heightFor(x, z, isFringe) {
       const rng = this.rng;
+      const theme = this.district.theme || {};
+      const maxH = theme.maxHeight || 230;
       const r = Math.hypot(x, z);
       const core = 1 - THREE.MathUtils.smoothstep(r, 120, 720);
       let h = 16 + core * 70 + rng() * (18 + core * 90);
       if (rng() < 0.05 + core * 0.12) h *= 1.6;
       if (isFringe) h = 14 + rng() * 40 + (rng() < 0.08 ? 90 : 0);
-      return Math.min(230, h);
+      return Math.min(maxH, h);
     }
 
     addBuilding(x0, z0, x1, z1, h, forcedStyle = null) {
@@ -749,13 +783,24 @@
 
       this.addSignage(x0, z0, x1, z1, h);
       this.collision.addBox(x0, z0, x1, z1, -1, h, 'building');
-      this.buildings.push({ x0, z0, x1, z1, h });
+      this.trackBuilding(x0, z0, x1, z1, h);
       this.stats.buildings++;
+    }
+
+    /** Records a building footprint for minimap / queries (both rect + center forms). */
+    trackBuilding(x0, z0, x1, z1, h) {
+      this.buildings.push({
+        x0, z0, x1, z1, h,
+        x: (x0 + x1) * 0.5, z: (z0 + z1) * 0.5,
+        hx: (x1 - x0) * 0.5, hz: (z1 - z0) * 0.5
+      });
     }
 
     /** Neon signs & storefront strips on the road-facing wall. */
     addSignage(x0, z0, x1, z1, h) {
       const rng = this.rng;
+      const theme = this.district.theme || {};
+      const signage = theme.signage !== undefined ? theme.signage : 1;
       const cx = (x0 + x1) * 0.5; const cz = (z0 + z1) * 0.5;
       const near = this.network.nearestRoadPoint(cx, cz, 120);
       if (!near) return;
@@ -773,11 +818,11 @@
       const off = 0.12;
 
       // storefront light strip
-      if (rng() < 0.65 && h > 6) {
+      if (rng() < 0.65 * signage && h > 6) {
         neon.addBillboard(wx + nx * off, 3.4, wz + nz * off, nx, nz, wallLen - 1.0, 0.35, [1.0, 0.86, 0.6]);
       }
       // horizontal neon sign
-      if (rng() < 0.6 && h > 12) {
+      if (rng() < 0.6 * signage && h > 12) {
         const color = NEON_PALETTE[Math.floor(rng() * NEON_PALETTE.length)];
         const width = Math.min(wallLen - 2, 5 + rng() * 6);
         const y = 5.5 + rng() * Math.min(10, h - 8);
@@ -787,7 +832,7 @@
         neon.addBillboard(sx, y, sz, nx, nz, width, 1.3 + rng() * 0.8, color);
       }
       // vertical neon blade
-      if (rng() < 0.28 && h > 18) {
+      if (rng() < 0.28 * signage && h > 18) {
         const color = NEON_PALETTE[Math.floor(rng() * NEON_PALETTE.length)];
         const height = 6 + rng() * 8;
         const y = 8 + height * 0.5 + rng() * 4;
@@ -798,7 +843,7 @@
         neon.addBillboard(sx, y, sz, nz, -nx, 1.6, height, color);
       }
       // rooftop edge glow on tall towers
-      if (h > 100 && rng() < 0.7) {
+      if (h > 100 && rng() < 0.7 * signage) {
         const color = NEON_PALETTE[Math.floor(rng() * NEON_PALETTE.length)];
         neon.addWalls(x0 - 0.05, z0 - 0.05, x1 + 0.05, z1 + 0.05, h - 1.2, h - 0.6, [1, 1], color);
       }
@@ -845,8 +890,40 @@
           this.addFountain(l);
         } else if (l.type === 'planters') {
           this.addPlanters(l.area);
+        } else if (l.type === 'containers') {
+          this.addContainerYard(l);
         }
       });
+    }
+
+    /** Stacked shipping-container yard (industrial districts). */
+    addContainerYard(l) {
+      const rng = this.rng;
+      const prop = this.batch('prop');
+      const palette = [
+        [0.62, 0.16, 0.10], [0.10, 0.28, 0.55], [0.16, 0.45, 0.22],
+        [0.75, 0.42, 0.08], [0.55, 0.57, 0.60], [0.35, 0.22, 0.45]
+      ];
+      const W = 12.2; const D = 2.6; const H = 2.9;
+      const cols = l.cols || 5; const rows = l.rows || 3; const gap = l.gap || 16;
+      const x0 = l.x - ((cols - 1) * gap) * 0.5;
+      const z0 = l.z - ((rows - 1) * gap) * 0.5;
+      for (let c = 0; c < cols; c++) {
+        for (let r = 0; r < rows; r++) {
+          const cx = x0 + c * gap;
+          const cz = z0 + r * gap;
+          const levels = 1 + (rng() < 0.45 ? 1 : 0);
+          for (let lv = 0; lv < levels; lv++) {
+            const y0 = 0.12 + lv * (H + 0.15);
+            const color = palette[Math.floor(rng() * palette.length)];
+            prop.addBox(cx - W * 0.5, y0, cz - D * 0.5, cx + W * 0.5, y0 + H, cz + D * 0.5, color);
+            // ribbed-door end cap
+            prop.addBox(cx + W * 0.5 - 0.3, y0 + 0.2, cz - D * 0.5 + 0.2, cx + W * 0.5 + 0.05, y0 + H - 0.2, cz + D * 0.5 - 0.2, [0.2, 0.2, 0.22]);
+          }
+          this.collision.addBox(cx - W * 0.5, cz - D * 0.5, cx + W * 0.5, cz + D * 0.5, -1, 0.12 + levels * (H + 0.15), 'containers');
+          this.trackBuilding(cx - W * 0.5, cz - D * 0.5, cx + W * 0.5, cz + D * 0.5, 3.2 * levels);
+        }
+      }
     }
 
     addStadium(l) {
@@ -888,7 +965,7 @@
         this.batch('prop').addBox(px - 0.6, 0.12, pz - 0.6, px + 0.6, h + 26, pz + 0.6, [0.5, 0.5, 0.55]);
         this.batch('neon').addBox(px - 2.2, h + 24, pz - 0.6, px + 2.2, h + 26, pz + 0.6, [1, 1, 0.9]);
       });
-      this.buildings.push({ x0: l.x - l.rx, z0: l.z - l.rz, x1: l.x + l.rx, z1: l.z + l.rz, h });
+      this.trackBuilding(l.x - l.rx, l.z - l.rz, l.x + l.rx, l.z + l.rz, h);
     }
 
     addFountain(l) {
@@ -962,14 +1039,14 @@
       });
       // roof edge glow + sign
       neon.addWalls(x0 - 0.05, z0 - 0.05, x1 + 0.05, z1 + 0.05, b.height - 0.9, b.height - 0.4, [1, 1], [0.0, 0.94, 1.0]);
-      const signTex = TextureFactory.textSign('APEX GARAGE', '#00f0ff', 1024, 192);
+      const signTex = TextureFactory.textSign(g.sign || 'APEX GARAGE', '#00f0ff', 1024, 192);
       const sign = new THREE.Mesh(new THREE.PlaneGeometry(36, 6.75),
         new THREE.MeshBasicMaterial({ map: signTex, transparent: false, toneMapped: false }));
       sign.position.set(b.x, b.height + 4.5, z1 + 0.3);
       this.group.add(sign);
       this.stats.drawCalls++;
       this.collision.addBox(x0, z0, x1, z1, -1, b.height, 'garage');
-      this.buildings.push({ x0, z0, x1, z1, h: b.height });
+      this.trackBuilding(x0, z0, x1, z1, b.height);
     }
 
     // ── Ramps ────────────────────────────────────────────────────────────

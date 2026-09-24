@@ -11,6 +11,10 @@
 (function () {
   const FIXED_DT = 1 / 120;
   const MAX_STEPS = 6;
+  const NIGHT_BG = new THREE.Color(0x070714);
+  // Minimap filter slots (keys 1-4).
+  const FILTER_KEYS = ['events', 'garage', 'discoveries', 'caches'];
+  const FILTER_LABELS = { events: 'Events', garage: 'Garage', discoveries: 'Discoveries', caches: 'Caches' };
 
   class OpenWorldCamera extends window.ChaseCamera {
     constructor(camera, target, collision) {
@@ -48,11 +52,29 @@
       this.scene = game.scene;
       this.camera = game.camera;
       this.renderer = game.renderer;
+      this.districtId = 'apex_downtown';
       this.district = window.DistrictApexDowntown;
       this.eventDefs = window.DistrictApexDowntownEvents || [];
       this.built = false;
+      this.builtDistrictId = null;
       this.active = false;
       this.paused = false;
+      // Day/night cycle: 19:30 dusk peak, full 24 h every 8 minutes.
+      this.timeOfDay = 19.5;
+      this._todTimer = 0;
+      this._nightFactor = 0;
+      this._lightBase = null;
+      this._fogBase = null;
+      // Free-roam weather.
+      this._weatherKind = 'clear';
+      this._weatherTimer = 0;
+      this._wetTarget = 0;
+      // Dynamic quality (settings-graphics 'auto').
+      this._autoQuality = 'high';
+      this._autoTimer = 0;
+      this._autoUpStreak = 0;
+      // Gamepad menu navigation.
+      this._gpFocus = 0;
       this.network = null;
       this.world = null;
       this.worldQuery = null;
@@ -83,41 +105,73 @@
     // ── World lifecycle ──────────────────────────────────────────────────
     prepare() {
       if (this.built) return;
+      this.buildDistrict('apex_downtown');
+      this.detach();
+    }
+
+    /** District the save wants us in (falls back to downtown when locked). */
+    savedDistrictId() {
+      const id = window.SaveManager ? window.SaveManager.getProfile().progress.lastDistrict : null;
+      if (id && window.DistrictRegistry && window.DistrictRegistry.get(id) && window.DistrictRegistry.isUnlocked(id)) return id;
+      return 'apex_downtown';
+    }
+
+    /**
+     * (Re)builds the world for a district, disposing the previous one.
+     * Safe to call before first enter (prepare) and live (fast travel).
+     */
+    buildDistrict(id) {
       const t0 = performance.now();
-      this.network = new window.RoadNetwork(this.district);
+      if (this.built) {
+        this.removePlayer();
+        if (this.traffic) { this.traffic.dispose(); this.traffic = null; }
+        if (this.events) { this.events.dispose(); this.events = null; }
+        if (this.world) { this.world.dispose(); this.world = null; }
+        [this.discoveryGroup, this.garageGroup, this.cacheGroup].forEach((g) => { if (g) this.scene.remove(g); });
+        this.discoveryGroup = null; this.garageGroup = null; this.cacheGroup = null;
+        this.discoveryMeshes = []; this.cacheMeshes = [];
+      }
+      const def = (window.DistrictRegistry && window.DistrictRegistry.getDef(id)) || window.DistrictApexDowntown;
+      const evDefs = (window.DistrictRegistry && window.DistrictRegistry.getEvents(id)) || window.DistrictApexDowntownEvents || [];
+      this.districtId = def.id;
+      this.district = def;
+      this.eventDefs = evDefs;
+      this.network = new window.RoadNetwork(def);
       const quality = this.getQualityPreset();
-      this.world = new window.WorldBuilder(this.scene, this.district, this.network, quality);
+      this.world = new window.WorldBuilder(this.scene, def, this.network, quality);
       this.worldQuery = {
         network: this.network,
         collision: this.world.collision,
-        spawn: this.district.spawn,
+        spawn: def.spawn,
         getGroundHeight: (x, z) => this.world.getGroundHeight(x, z),
         surfaceAt: (x, z) => this.world.surfaceAt(x, z)
       };
-      this.events = new window.EventSystem(this, this.eventDefs);
+      this.events = new window.EventSystem(this, evDefs);
       this.buildDiscoveryMarkers();
       this.buildGarageMarker();
+      this.buildCacheMarkers();
       this.built = true;
+      this.builtDistrictId = def.id;
       this.buildMs = performance.now() - t0;
-      console.info(`[OpenWorld] ${this.district.name} built in ${this.buildMs.toFixed(0)} ms — ${this.world.stats.buildings} buildings, ${this.world.stats.drawCalls} static draw calls`);
-      this.detach();
+      console.info(`[OpenWorld] ${def.name} built in ${this.buildMs.toFixed(0)} ms — ${this.world.stats.buildings} buildings, ${this.world.stats.drawCalls} static draw calls`);
     }
 
     getQualityPreset() {
       const sel = document.getElementById('settings-graphics');
       const v = sel ? sel.value : 'high';
+      if (v === 'auto') return this._autoQuality || 'high';
       return v === 'low' ? 'low' : (v === 'medium' ? 'medium' : 'high');
     }
 
     attach() {
       if (!this.built) this.prepare();
-      [this.world.group, this.events.markerGroup, this.events.gateGroup, this.discoveryGroup, this.garageGroup].forEach((g) => {
+      [this.world.group, this.events.markerGroup, this.events.gateGroup, this.discoveryGroup, this.garageGroup, this.cacheGroup].forEach((g) => {
         if (g && g.parent !== this.scene) this.scene.add(g);
       });
     }
 
     detach() {
-      [this.world && this.world.group, this.events && this.events.markerGroup, this.events && this.events.gateGroup, this.discoveryGroup, this.garageGroup].forEach((g) => {
+      [this.world && this.world.group, this.events && this.events.markerGroup, this.events && this.events.gateGroup, this.discoveryGroup, this.garageGroup, this.cacheGroup].forEach((g) => {
         if (g && g.parent === this.scene) this.scene.remove(g);
       });
     }
@@ -146,6 +200,119 @@
       if (g.sceneLight_dir) {
         g.sceneLight_dir.castShadow = this.getQualityPreset() !== 'low';
       }
+      // Capture the dusk baseline so the day/night cycle + weather can modulate it.
+      this._lightBase = {
+        hemiInt: g.sceneLight_hemi ? g.sceneLight_hemi.intensity : 1,
+        dirInt: g.sceneLight_dir ? g.sceneLight_dir.intensity : 1,
+        exposure: this.renderer ? this.renderer.toneMappingExposure : 1,
+        bg: this.scene.background && this.scene.background.isColor ? this.scene.background.clone() : new THREE.Color(0x1a0f2e),
+        bloom: (p && p.bloomPass) ? p.bloomPass.strength : undefined
+      };
+      this._fogBase = this.scene.fog ? { color: this.scene.fog.color.getHex(), density: this.scene.fog.density } : null;
+      this.applyTimeOfDay();
+    }
+
+    /** Blend factor night ∈ [0,1] from the time of day (dusk peak 19:30). */
+    nightFactor(t) {
+      let d = Math.abs(t - 1.5); // deep-night peak at 01:30
+      if (d > 12) d = 24 - d;
+      return 1 - THREE.MathUtils.smoothstep(d, 2.0, 9.0);
+    }
+
+    clockString() {
+      const h = Math.floor(this.timeOfDay) % 24;
+      const m = Math.floor((this.timeOfDay % 1) * 60);
+      return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+    }
+
+    /** Applies the current time of day on top of the dusk baseline. */
+    applyTimeOfDay() {
+      const base = this._lightBase;
+      if (!base) return;
+      const night = this.nightFactor(this.timeOfDay);
+      this._nightFactor = night;
+      const g = this.game;
+      if (g.sceneLight_hemi) g.sceneLight_hemi.intensity = base.hemiInt * (1 - 0.5 * night);
+      if (g.sceneLight_dir) g.sceneLight_dir.intensity = base.dirInt * (1 - 0.6 * night);
+      if (this.renderer) this.renderer.toneMappingExposure = base.exposure * (1 - 0.22 * night);
+      if (this.scene.background && this.scene.background.isColor) this.scene.background.copy(base.bg).lerp(NIGHT_BG, night);
+      if (this.world && this.world.sky && this.world.sky.material) this.world.sky.material.color.setScalar(1 - 0.55 * night);
+      if (g.pipeline && g.pipeline.bloomPass && base.bloom !== undefined) g.pipeline.bloomPass.strength = base.bloom * (1 + 0.3 * night);
+    }
+
+    updateTimeOfDay(dt) {
+      if (!this.active || this.paused) return;
+      if (!(window.SaveManager && window.SaveManager.getSetting('dayNightCycle', true))) return;
+      this.timeOfDay = (this.timeOfDay + dt * (24 / 480)) % 24; // full day every 8 min
+      this._todTimer += dt;
+      if (this._todTimer > 2) { this._todTimer = 0; this.applyTimeOfDay(); }
+    }
+
+    /** Rolls district weather (particles + fog + grip). `force` skips the toast. */
+    rollFreeRoamWeather(force = false) {
+      const w = this.game.weather;
+      if (!w || typeof w.applyAmbientWeather !== 'function') return;
+      if (!(window.SaveManager && window.SaveManager.getSetting('freeRoamWeather', true))) {
+        if (force) { this._weatherKind = 'clear'; this._wetTarget = 0; w.applyAmbientWeather('clear', this._fogBase); }
+        return;
+      }
+      const climate = this.district.climate || { clear: 1 };
+      const entries = Object.entries(climate);
+      const total = entries.reduce((s, entry) => s + entry[1], 0) || 1;
+      let r = Math.random() * total;
+      let pick = 'clear';
+      for (let i = 0; i < entries.length; i++) { r -= entries[i][1]; if (r <= 0) { pick = entries[i][0]; break; } }
+      if (!force && pick === this._weatherKind) return;
+      this._weatherKind = pick;
+      w.applyAmbientWeather(pick, this._fogBase);
+      this._wetTarget = pick === 'rain' ? 0.85 : 0;
+      if (!force) {
+        if (pick === 'rain') this.toast('Rain moving in — grip reduced', 'warn', 3);
+        else if (pick === 'fog') this.toast('Fog rolling in — visibility low', 'warn', 3);
+        else this.toast('Skies clearing over ' + this.district.name, 'info', 2);
+      }
+    }
+
+    updateFreeRoamWeather(dt) {
+      if (!this.active || this.paused) return;
+      this._weatherTimer += dt;
+      if (this._weatherTimer > 150) { this._weatherTimer = 0; this.rollFreeRoamWeather(false); }
+      if (this.player && this.player.surfaceWetness !== undefined) {
+        const w = this.player.surfaceWetness;
+        this.player.surfaceWetness = w + (this._wetTarget - w) * Math.min(1, dt * 0.5);
+      }
+    }
+
+    /** Dynamic resolution/shadow stepping for the 'auto' graphics preset. */
+    autoQualityTick(dt) {
+      const sel = document.getElementById('settings-graphics');
+      if (!sel || sel.value !== 'auto' || !this.active || this.paused) return;
+      this._autoTimer += dt;
+      if (this._autoTimer < 2) return;
+      this._autoTimer = 0;
+      const order = ['low', 'medium', 'high'];
+      let cur = Math.max(0, order.indexOf(this._autoQuality || 'high'));
+      const fps = this.perf.fps;
+      if (fps < 40 && cur > 0) { cur--; this._autoUpStreak = 0; }
+      else if (fps > 57 && cur < 2) {
+        this._autoUpStreak++;
+        if (this._autoUpStreak < 3) return;
+        cur++;
+      } else { this._autoUpStreak = 0; return; }
+      this._autoQuality = order[cur];
+      this._autoUpStreak = 0;
+      if (cur === 0) {
+        this.renderer.shadowMap.enabled = false;
+        this.renderer.setPixelRatio(1);
+      } else if (cur === 1) {
+        this.renderer.shadowMap.enabled = true;
+        this.renderer.setPixelRatio(1.25);
+      } else {
+        this.renderer.shadowMap.enabled = true;
+        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      }
+      if (this.game.sceneLight_dir) this.game.sceneLight_dir.castShadow = cur !== 0;
+      if (this.game.weather) this.game.weather.setQuality(this._autoQuality);
     }
 
     /**
@@ -173,7 +340,9 @@
       this.active = true;
       this.paused = false;
       this.accumulator = 0;
+      this._weatherTimer = 0;
       this.showHud(true);
+      this.rollFreeRoamWeather(true);
       window.addEventListener('keydown', this.onKeyDown);
 
       if (window.SoundEngine) {
@@ -200,17 +369,75 @@
 
     resolveSpawn(spawn) {
       const d = this.district;
-      if (spawn && typeof spawn === 'object') return spawn;
-      if (spawn === 'garage') return d.garage.spawn;
-      if (spawn === 'last' && window.SaveManager) {
+      let pose = null;
+      if (spawn && typeof spawn === 'object') pose = spawn;
+      else if (spawn === 'garage') pose = d.garage.spawn;
+      else if (spawn === 'last' && window.SaveManager) {
         const lp = window.SaveManager.getProfile().progress.lastPosition;
         if (lp && Number.isFinite(lp.x) && Number.isFinite(lp.z)) {
           // only trust it if it is near a road
           const near = this.network.nearestRoadPoint(lp.x, lp.z, 40);
-          if (near) return lp;
+          if (near) pose = lp;
         }
       }
-      return d.spawn;
+      if (!pose) pose = d.spawn;
+      return this.clearSpawn(pose);
+    }
+
+    /**
+     * Nudges a spawn pose out of solid geometry (spiral search, keeps yaw).
+     * Guarantees the player never materialises inside a building.
+     */
+    clearSpawn(pose) {
+      if (!pose || !this.world || !this.world.collision) return pose;
+      const col = this.world.collision;
+      if (!col.resolveCircle(pose.x, pose.z, 2.5)) return pose;
+      for (let r = 4; r <= 44; r += 4) {
+        for (let a = 0; a < 8; a++) {
+          const x = pose.x + Math.cos((a / 8) * Math.PI * 2) * r;
+          const z = pose.z + Math.sin((a / 8) * Math.PI * 2) * r;
+          if (!col.resolveCircle(x, z, 2.5)) return { x, z, yaw: pose.yaw || 0 };
+        }
+      }
+      return pose;
+    }
+
+    /**
+     * Fast travel to another unlocked district (rebuilds the world live).
+     * Only available while free-roaming outside events.
+     */
+    switchDistrict(id, spawn = 'garage') {
+      if (!this.active) return false;
+      if (this.events && this.events.state !== 'idle') {
+        this.toast('Finish or abandon the event before travelling', 'warn', 3);
+        return false;
+      }
+      if (!window.DistrictRegistry || !window.DistrictRegistry.get(id)) return false;
+      if (!window.DistrictRegistry.isUnlocked(id)) {
+        const e = window.DistrictRegistry.get(id);
+        this.toast(`${e.name} unlocks at ${e.unlockRep} REP`, 'warn', 3);
+        return false;
+      }
+      if (id === this.districtId) return true;
+      this.persistPosition(true);
+      const carId = this.playerCarId;
+      this.removePlayer();
+      if (this.traffic) { this.traffic.dispose(); this.traffic = null; }
+      this.detach();
+      this.buildDistrict(id);
+      this.attach();
+      this.applyLighting();
+      this.spawnPlayer(carId, this.resolveSpawn(spawn));
+      const density = window.SaveManager ? window.SaveManager.getSetting('trafficDensity', 'normal') : 'normal';
+      this.traffic = new window.TrafficSystem(this.scene, this.network, this.world, density);
+      if (this.chaseCamera) this.chaseCamera.target = this.player;
+      if (this.hud) this.hud.buildRoadCache();
+      this._weatherTimer = 0;
+      this.rollFreeRoamWeather(true);
+      this.persistPosition(true);
+      this.closePauseMenu();
+      this.toast(`${this.district.name} — ${this.district.tagline}`, 'info', 4);
+      return true;
     }
 
     spawnPlayer(carId, pose) {
@@ -297,6 +524,37 @@
       this.scene.add(this.garageGroup);
     }
 
+    buildCacheMarkers() {
+      this.cacheGroup = new THREE.Group();
+      this.cacheGroup.name = 'caches';
+      const geo = new THREE.BoxGeometry(1.6, 1.6, 1.6);
+      this.cacheMeshes = (this.district.caches || []).map((c) => {
+        const found = window.SaveManager ? window.SaveManager.hasCache(c.id) : false;
+        const mat = new THREE.MeshBasicMaterial({ color: 0x37ff9e, transparent: true, opacity: 0.92, depthWrite: false });
+        const mesh = new THREE.Mesh(geo, mat);
+        const gy = this.world ? this.world.getGroundHeight(c.x, c.z) : 0;
+        mesh.position.set(c.x, 2.2 + gy, c.z);
+        mesh.visible = !found;
+        mesh.userData.cache = c;
+        this.cacheGroup.add(mesh);
+        return mesh;
+      });
+      this.scene.add(this.cacheGroup);
+    }
+
+    onCache(c, mesh) {
+      mesh.visible = false;
+      if (window.SaveManager) {
+        if (!window.SaveManager.addCache(c.id)) return;
+        window.SaveManager.addCash(c.credits);
+        const info = window.SaveManager.addReputation(40);
+        this.toast(`Neon cache: ${c.name}  +₡${c.credits}  +40 REP`, 'success', 4);
+        if (info.leveledUp) this.toast(`Reputation level ${info.level}: ${info.title}`, 'level', 5);
+        this.events.refreshMarkerLocks();
+      }
+      if (window.SoundEngine) window.SoundEngine.playBeep(true);
+    }
+
     // ── Frame ─────────────────────────────────────────────────────────────
     frame(dt) {
       if (!this.active) return;
@@ -305,6 +563,9 @@
 
       const input = this.paused ? { throttle: 0, brake: 0, steer: 0, handbrake: false, nitro: false, reset: false } : this.game.pollNormalizedInputs();
       this.handleGamepadMeta(input);
+      this.updateTimeOfDay(dt);
+      this.updateFreeRoamWeather(dt);
+      this.autoQualityTick(dt);
 
       if (!this.paused) {
         this.accumulator = Math.min(this.accumulator + dt, FIXED_DT * MAX_STEPS);
@@ -421,6 +682,15 @@
         const d = m.userData.discovery;
         if (Math.hypot(p.position.x - d.x, p.position.z - d.z) < d.radius) this.onDiscovery(d, m);
       }
+      // neon caches (collectibles)
+      for (let i = 0; i < (this.cacheMeshes || []).length; i++) {
+        const m = this.cacheMeshes[i];
+        if (!m.visible) continue;
+        m.rotation.y += dt * 2.2;
+        m.rotation.x += dt * 0.9;
+        const c = m.userData.cache;
+        if (Math.hypot(p.position.x - c.x, p.position.z - c.z) < 7) this.onCache(c, m);
+      }
     }
 
     onDiscovery(d, mesh) {
@@ -511,7 +781,7 @@
       // D-pad up (12) = camera · D-pad down (13) = full map
       if (typeof navigator === 'undefined' || !navigator.getGamepads) return;
       const pads = navigator.getGamepads();
-      let start = false; let y = false; let up = false; let down = false;
+      let start = false; let y = false; let up = false; let down = false; let a = false;
       for (let i = 0; i < pads.length; i++) {
         const gp = pads[i];
         if (!gp || !gp.connected) continue;
@@ -520,10 +790,18 @@
         y = !!(b[3] && b[3].pressed);
         up = !!(b[12] && b[12].pressed);
         down = !!(b[13] && b[13].pressed);
+        a = !!(b[0] && b[0].pressed);
         break;
       }
       if (start && !this._gpStart) this.togglePause();
       this._gpStart = start;
+      // Pause-menu navigation: D-pad up/down moves focus, A activates.
+      if (this.pauseMenuOpen) {
+        this.gamepadMenuNav(up, down, a);
+        this._gpUp = up; this._gpDown = down; this._gpA = a;
+        this._gpY = y;
+        return;
+      }
       if (y && !this._gpY && !this.paused && this.prompt && Math.abs(this.player.speed) < 3) this.interact();
       this._gpY = y;
       if (up && !this._gpUp && !this.paused && this.chaseCamera) {
@@ -535,38 +813,52 @@
       this._gpDown = down;
     }
 
+    /** D-pad up/down moves pause-menu focus, A activates the focused button. */
+    gamepadMenuNav(up, down, a) {
+      const menu = this.dom.pause;
+      if (!menu) return;
+      const btns = [...menu.querySelectorAll('.ws-btn')].filter((b) => b.style.display !== 'none' && !b.disabled);
+      if (!btns.length) return;
+      if (this._gpMenuIndex === undefined || this._gpMenuIndex < 0 || this._gpMenuIndex >= btns.length) this._gpMenuIndex = 0;
+      if (up && !this._gpUp) this._gpMenuIndex = (this._gpMenuIndex + btns.length - 1) % btns.length;
+      if (down && !this._gpDown) this._gpMenuIndex = (this._gpMenuIndex + 1) % btns.length;
+      btns.forEach((b, i) => b.classList.toggle('gp-focus', i === this._gpMenuIndex));
+      if (a && !this._gpA && btns[this._gpMenuIndex]) btns[this._gpMenuIndex].click();
+    }
+
     onKeyDown(e) {
       if (!this.active) return;
+      const C = window.FreeRacerControls;
+      const is = (action, codes) => (C ? C.matches(action, e.code) : codes.includes(e.code));
       if (this.resultsOpen) {
         if (e.code === 'Enter' || e.code === 'Space') { e.preventDefault(); this.continueFromResults(); }
-        if (e.code === 'KeyR') this.retryEvent();
+        if (is('reset', ['KeyR'])) this.retryEvent();
+        return;
+      }
+      // Map filter toggles (fixed keys 1–4).
+      if (!this.paused && this.hud && ['Digit1', 'Digit2', 'Digit3', 'Digit4'].includes(e.code)) {
+        const key = FILTER_KEYS[Number(e.code.slice(-1)) - 1];
+        const on = this.hud.setFilter(key, !this.hud.filters[key]);
+        this.toast(`Map: ${FILTER_LABELS[key]} ${on ? 'shown' : 'hidden'}`, 'info', 1.5);
         return;
       }
       const settings = document.getElementById('settings-modal');
       const settingsOpen = settings && settings.style.display === 'flex';
-      switch (e.code) {
-        case 'Escape':
-          if (settingsOpen) this.game.closeSettings(); // closeSettings() re-opens the pause menu
-          else this.togglePause();
-          break;
-        case 'KeyE':
-        case 'Enter':
-          if (!this.paused) this.interact();
-          break;
-        case 'KeyC':
-          if (this.chaseCamera && !this.paused) {
-            const mode = this.chaseCamera.toggleView();
-            if (window.SaveManager) window.SaveManager.setSetting('cameraMode', mode);
-            this.toast(`Camera: ${mode}`, 'info', 1.5);
-          }
-          break;
-        case 'KeyM':
-          if (!this.paused && this.hud) this.hud.toggleBigMap();
-          break;
-        case 'KeyN':
-          if (!this.paused && this.hud) this.hud.toggleMinimapRotation();
-          break;
-        default: break;
+      if (is('pause', ['Escape'])) {
+        if (settingsOpen) this.game.closeSettings(); // closeSettings() re-opens the pause menu
+        else this.togglePause();
+      } else if (is('interact', ['KeyE', 'Enter'])) {
+        if (!this.paused) this.interact();
+      } else if (is('camera', ['KeyC'])) {
+        if (this.chaseCamera && !this.paused) {
+          const mode = this.chaseCamera.toggleView();
+          if (window.SaveManager) window.SaveManager.setSetting('cameraMode', mode);
+          this.toast(`Camera: ${mode}`, 'info', 1.5);
+        }
+      } else if (is('map', ['KeyM'])) {
+        if (!this.paused && this.hud) this.hud.toggleBigMap();
+      } else if (is('minimapRotate', ['KeyN'])) {
+        if (!this.paused && this.hud) this.hud.toggleMinimapRotation();
       }
     }
 
@@ -593,8 +885,11 @@
         if (this.dom.pauseStats && window.SaveManager) {
           const info = window.SaveManager.getLevelInfo();
           const prog = window.SaveManager.getProfile().progress;
-          this.dom.pauseStats.textContent = `Level ${info.level} ${info.title} · ${info.reputation} REP · ₡${window.SaveManager.getCash().toLocaleString()} · ${prog.discoveries.length}/${this.district.discoveries.length} discoveries · ${Object.keys(prog.eventRecords).length}/${this.eventDefs.length} events cleared`;
+          const totals = window.DistrictRegistry ? window.DistrictRegistry.totals() : { districts: 1, events: this.eventDefs.length, discoveries: this.district.discoveries.length };
+          const unlocked = window.DistrictRegistry ? window.DistrictRegistry.unlocked().length : 1;
+          this.dom.pauseStats.textContent = `Level ${info.level} ${info.title} · ${info.reputation} REP · ₡${window.SaveManager.getCash().toLocaleString()} · ${unlocked}/${totals.districts} districts · ${Object.keys(prog.eventRecords).length}/${totals.events} events cleared · ${prog.discoveries.length}/${totals.discoveries} discoveries`;
         }
+        this.refreshDistrictSelect();
       }
       if (window.SoundEngine && typeof window.SoundEngine.silenceGameplayAudio === 'function') window.SoundEngine.silenceGameplayAudio();
     }
@@ -602,8 +897,34 @@
     closePauseMenu() {
       this.paused = false;
       this.pauseMenuOpen = false;
-      if (this.dom.pause) this.dom.pause.classList.add('hidden');
+      this._gpFocus = 0;
+      this._gpMenuIndex = 0;
+      if (this.dom.pause) {
+        this.dom.pause.classList.add('hidden');
+        this.dom.pause.querySelectorAll('.gp-focus').forEach((el) => el.classList.remove('gp-focus'));
+      }
       if (window.SoundEngine && window.SoundEngine.ensureContext) window.SoundEngine.ensureContext();
+    }
+
+    /** Fills the fast-travel district dropdown (called when the pause menu opens). */
+    refreshDistrictSelect() {
+      const sel = this.dom.districtSelect;
+      if (!sel || !window.DistrictRegistry) return;
+      const rep = window.SaveManager ? window.SaveManager.getReputation() : 0;
+      sel.innerHTML = '';
+      window.DistrictRegistry.list().forEach((e) => {
+        const opt = document.createElement('option');
+        opt.value = e.id;
+        const locked = rep < e.unlockRep;
+        opt.textContent = locked ? `${e.name} — locked (${e.unlockRep} REP)` : (e.id === this.districtId ? `${e.name} — current` : e.name);
+        if (e.id === this.districtId) opt.selected = true;
+        sel.appendChild(opt);
+      });
+      if (this.dom.travelBtn) {
+        const inEvent = this.events && this.events.state !== 'idle';
+        this.dom.travelBtn.disabled = !!inEvent;
+        this.dom.travelBtn.title = inEvent ? 'Finish or abandon the event first' : 'Fast travel (spawns at the district garage)';
+      }
     }
 
     // ── Results ───────────────────────────────────────────────────────────
@@ -613,14 +934,19 @@
       if (!d.results) return;
       const fmt = (t) => window.OpenWorldHUD.formatTime(t);
       d.resultsTitle.textContent = r.event.name;
-      const posLabel = r.event.type === 'timetrial' ? `${r.medal === 'none' ? 'NO MEDAL' : r.medal.toUpperCase() + ' MEDAL'}` : `${OpenWorldManager.ordinal(r.position)} PLACE`;
+      const solo = r.event.type === 'timetrial' || r.event.type === 'drift';
+      const posLabel = solo ? `${r.medal === 'none' ? 'NO MEDAL' : r.medal.toUpperCase() + ' MEDAL'}` : `${OpenWorldManager.ordinal(r.position)} PLACE`;
       d.resultsPosition.textContent = posLabel;
       d.resultsPosition.className = 'ow-results-position medal-' + r.medal;
-      d.resultsTime.textContent = fmt(r.time);
+      d.resultsTime.textContent = r.event.type === 'drift' ? `${(r.driftScore || 0).toLocaleString()} PTS · ${fmt(r.time)}` : fmt(r.time);
       const tags = [];
       if (r.firstClear) tags.push('FIRST CLEAR');
       if (r.newBest && !r.firstClear) tags.push('NEW PERSONAL BEST');
       if (r.replay) tags.push('REPLAY REWARDS ×0.5');
+      (r.championships || []).forEach((c) => {
+        if (c.firstCompletion) tags.push(`🏆 ${c.name.toUpperCase()} COMPLETE`);
+        else tags.push(`🏆 ${c.name.toUpperCase()} +${c.roundPoints} PTS (${c.points})`);
+      });
       d.resultsTags.textContent = tags.join(' · ');
       // standings / medal table
       let rows = '';
@@ -630,6 +956,12 @@
         rows += `<div class="ow-row ${r.medal === 'silver' ? 'hit' : ''}"><span>🥈 Silver</span><span>${fmt(mt.silver)}</span></div>`;
         rows += `<div class="ow-row ${r.medal === 'bronze' ? 'hit' : ''}"><span>🥉 Bronze</span><span>${fmt(mt.bronze)}</span></div>`;
         rows += `<div class="ow-row you"><span>You</span><span>${fmt(r.time)}</span></div>`;
+      } else if (r.event.type === 'drift') {
+        const t = r.driftTargets || { gold: 1000, silver: 600, bronze: 300 };
+        rows += `<div class="ow-row ${r.medal === 'gold' ? 'hit' : ''}"><span>🥇 Gold</span><span>${t.gold.toLocaleString()} pts</span></div>`;
+        rows += `<div class="ow-row ${r.medal === 'silver' ? 'hit' : ''}"><span>🥈 Silver</span><span>${t.silver.toLocaleString()} pts</span></div>`;
+        rows += `<div class="ow-row ${r.medal === 'bronze' ? 'hit' : ''}"><span>🥉 Bronze</span><span>${t.bronze.toLocaleString()} pts</span></div>`;
+        rows += `<div class="ow-row you"><span>You</span><span>${(r.driftScore || 0).toLocaleString()} pts</span></div>`;
       } else {
         r.standings.forEach((s, i) => {
           const car = window.getCarById && s.carId ? window.getCarById(s.carId) : null;
@@ -693,6 +1025,8 @@
         pauseRestartEvent: $('btn-ow-restart-event'),
         pauseAssist: $('ow-assist-level'),
         pauseTraffic: $('ow-traffic-density'),
+        districtSelect: $('ow-district-select'),
+        travelBtn: $('btn-ow-travel'),
         pauseStats: $('ow-pause-stats'),
         results: $('ow-results'),
         resultsTitle: $('ow-results-title'),
@@ -712,6 +1046,7 @@
       on('btn-ow-resume', () => this.closePauseMenu());
       on('btn-ow-restart-event', () => this.retryEvent());
       on('btn-ow-quit-event', () => this.quitEvent());
+      on('btn-ow-travel', () => { const sel = this.dom.districtSelect; if (sel && sel.value) this.switchDistrict(sel.value, 'garage'); });
       on('btn-ow-garage', () => { this.closePauseMenu(); this.enterGarage(); });
       on('btn-ow-settings', () => { if (this.dom.pause) this.dom.pause.classList.add('hidden'); this.pauseMenuOpen = false; this.game.openSettings(); });
       on('btn-ow-main-menu', () => { this.closePauseMenu(); this.game.goToMainMenu(); });

@@ -712,6 +712,8 @@ class SoundEngine {
   // CYBER RACE ANNOUNCER
   // ==========================================================================
   announce(text, isUrgent = false) {
+    // On-screen caption (shown even when muted — accessibility subtitles).
+    if (window.Accessibility) window.Accessibility.subtitle(text);
     if (this.isMuted) return;
 
     if (this.hasSpeech && 'SpeechSynthesisUtterance' in window) {

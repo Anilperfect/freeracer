@@ -729,7 +729,12 @@ class GameEngine {
       qSelect.onchange = () => {
         const val = qSelect.value;
         if (this.weather) this.weather.setQuality(val);
-        if (val === 'low') {
+        if (val === 'auto') {
+          // OpenWorldManager.autoQualityTick() takes over in free roam; start high.
+          this.renderer.shadowMap.enabled = true;
+          this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+          if (this.openWorld) { this.openWorld._autoQuality = 'high'; this.openWorld._autoUpStreak = 0; }
+        } else if (val === 'low') {
           this.renderer.shadowMap.enabled = false;
           this.renderer.setPixelRatio(1);
         } else if (val === 'medium') {
@@ -778,11 +783,122 @@ class GameEngine {
         if (window.SoundEngine) window.SoundEngine.setVoiceVolume(parseFloat(volVoice.value));
       };
     }
+
+    // ── v0.6.1: ambience, accessibility, remappable controls ──
+    const daynight = document.getElementById('settings-daynight');
+    if (daynight) {
+      daynight.onchange = () => {
+        if (window.SaveManager) window.SaveManager.setSetting('dayNightCycle', daynight.checked);
+      };
+    }
+    const frWeather = document.getElementById('settings-weather');
+    if (frWeather) {
+      frWeather.onchange = () => {
+        if (window.SaveManager) window.SaveManager.setSetting('freeRoamWeather', frWeather.checked);
+        if (this.openWorld && this.openWorld.active) this.openWorld.rollFreeRoamWeather(true);
+      };
+    }
+    const colorblind = document.getElementById('settings-colorblind');
+    if (colorblind && window.Accessibility) {
+      colorblind.onchange = () => window.Accessibility.set('colorblind', colorblind.value);
+    }
+    const textscale = document.getElementById('settings-textscale');
+    if (textscale && window.Accessibility) {
+      textscale.onchange = () => window.Accessibility.set('textScale', parseFloat(textscale.value));
+    }
+    const reduceMotion = document.getElementById('settings-reduce-motion');
+    if (reduceMotion && window.Accessibility) {
+      reduceMotion.onchange = () => window.Accessibility.set('reduceMotion', reduceMotion.checked);
+    }
+    const subtitles = document.getElementById('settings-subtitles');
+    if (subtitles && window.Accessibility) {
+      subtitles.onchange = () => window.Accessibility.set('subtitles', subtitles.checked);
+    }
+    const hcHud = document.getElementById('settings-hc-hud');
+    if (hcHud && window.Accessibility) {
+      hcHud.onchange = () => window.Accessibility.set('highContrastHud', hcHud.checked);
+    }
+    const resetControls = document.getElementById('btn-reset-controls');
+    if (resetControls) {
+      resetControls.onclick = () => {
+        if (window.FreeRacerControls) window.FreeRacerControls.reset();
+        this.buildControlsList();
+      };
+    }
+    this.buildControlsList();
+  }
+
+  /** Rebuilds the click-to-rebind control list in the settings modal. */
+  buildControlsList() {
+    const wrap = document.getElementById('settings-controls-list');
+    const C = window.FreeRacerControls;
+    if (!wrap || !C) return;
+    wrap.innerHTML = '';
+    Object.keys(C.defaults).forEach((action) => {
+      const row = document.createElement('div');
+      row.className = 'fr-key-row';
+      const label = document.createElement('span');
+      label.className = 'fr-key-label';
+      label.textContent = (C.constructor.LABELS && C.constructor.LABELS[action]) || action;
+      row.appendChild(label);
+      C.codesFor(action).forEach((code, slot) => {
+        const btn = document.createElement('button');
+        btn.className = 'fr-key-btn';
+        btn.type = 'button';
+        btn.textContent = C.constructor.pretty(code);
+        btn.addEventListener('click', () => this.captureRebind(action, slot, btn));
+        row.appendChild(btn);
+      });
+      wrap.appendChild(row);
+    });
+  }
+
+  /** Captures the next keypress as the binding for an action slot. */
+  captureRebind(action, slot, btn) {
+    const C = window.FreeRacerControls;
+    if (!C) return;
+    btn.textContent = 'press key…';
+    btn.classList.add('listening');
+    const handler = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      window.removeEventListener('keydown', handler, true);
+      btn.classList.remove('listening');
+      if (e.code === 'Escape' && action !== 'pause') { this.buildControlsList(); return; } // Esc cancels
+      const res = C.rebind(action, e.code, slot);
+      this.buildControlsList();
+      const note = document.getElementById('settings-controls-note');
+      if (note) {
+        note.textContent = res.conflict
+          ? `⚠ ${C.constructor.pretty(e.code)} is also used by “${(C.constructor.LABELS[res.conflict] || res.conflict)}” — both will trigger.`
+          : '';
+      }
+    };
+    window.addEventListener('keydown', handler, true);
+  }
+
+  /** Syncs settings-modal inputs with the save (called whenever it opens). */
+  syncSettingsUI() {
+    const sm = window.SaveManager;
+    const set = (id, val) => { const el = document.getElementById(id); if (!el) return; if (el.type === 'checkbox') el.checked = !!val; else el.value = val; };
+    if (sm) {
+      set('settings-daynight', sm.getSetting('dayNightCycle', true));
+      set('settings-weather', sm.getSetting('freeRoamWeather', true));
+    }
+    if (window.Accessibility) {
+      set('settings-colorblind', window.Accessibility.get('colorblind'));
+      set('settings-textscale', String(window.Accessibility.get('textScale')));
+      set('settings-reduce-motion', window.Accessibility.get('reduceMotion'));
+      set('settings-subtitles', window.Accessibility.get('subtitles'));
+      set('settings-hc-hud', window.Accessibility.get('highContrastHud'));
+    }
+    this.buildControlsList();
   }
 
   openSettings() {
     if (this.gameState !== 'PAUSED') this.settingsReturnState = this.gameState;
     this.gameState = 'PAUSED';
+    this.syncSettingsUI();
     const modal = document.getElementById('settings-modal');
     if (modal) modal.style.display = 'flex';
   }
@@ -1177,15 +1293,18 @@ class GameEngine {
   // NORMALIZED CONTROLLER INTERFACE (Keyboard, Touch & Gamepad)
   // ─────────────────────────────────────────────
   pollNormalizedInputs() {
-    let throttle = (this.activeKeys['KeyW'] || this.activeKeys['ArrowUp'] || this.touchInputs.gas) ? 1.0 : 0.0;
-    let brake = (this.activeKeys['KeyS'] || this.activeKeys['ArrowDown'] || this.touchInputs.brake) ? 1.0 : 0.0;
+    // Keyboard layer is remappable (FreeRacerControls); touch/gamepad fixed below.
+    const C = window.FreeRacerControls;
+    const held = (action, codes) => (C ? C.held(action, this.activeKeys) : codes.some((c) => this.activeKeys[c]));
+    let throttle = (held('accelerate', ['KeyW', 'ArrowUp']) || this.touchInputs.gas) ? 1.0 : 0.0;
+    let brake = (held('brake', ['KeyS', 'ArrowDown']) || this.touchInputs.brake) ? 1.0 : 0.0;
     let steer = 0.0;
-    if (this.activeKeys['KeyA'] || this.activeKeys['ArrowLeft'] || this.touchInputs.left) steer -= 1.0;
-    if (this.activeKeys['KeyD'] || this.activeKeys['ArrowRight'] || this.touchInputs.right) steer += 1.0;
+    if (held('steerLeft', ['KeyA', 'ArrowLeft']) || this.touchInputs.left) steer -= 1.0;
+    if (held('steerRight', ['KeyD', 'ArrowRight']) || this.touchInputs.right) steer += 1.0;
 
-    let handbrake = !!(this.activeKeys['Space'] || (steer !== 0 && brake > 0));
-    let nitro = !!(this.activeKeys['ShiftLeft'] || this.activeKeys['ShiftRight'] || this.touchInputs.nitro);
-    let reset = !!this.activeKeys['KeyR'];
+    let handbrake = !!(held('handbrake', ['Space']) || (steer !== 0 && brake > 0));
+    let nitro = !!(held('nitro', ['ShiftLeft', 'ShiftRight']) || this.touchInputs.nitro);
+    let reset = !!held('reset', ['KeyR']);
 
     // HTML5 Gamepad API Support (Unified normalized controller interface)
     if (typeof navigator !== 'undefined' && navigator.getGamepads) {

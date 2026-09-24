@@ -41,6 +41,8 @@
       this.ctx = this.canvas ? this.canvas.getContext('2d') : null;
       this.bigMap = false;
       this.rotate = window.SaveManager ? window.SaveManager.getSetting('minimapRotate', true) : true;
+      this.filters = Object.assign({ events: true, garage: true, discoveries: true, caches: true },
+        window.SaveManager ? window.SaveManager.getSetting('mapFilters', {}) : {});
       this.streetTimer = 0;
       this.lastStreet = '';
       this.cashTimer = 0;
@@ -87,6 +89,14 @@
       this.rotate = !this.rotate;
       if (window.SaveManager) window.SaveManager.setSetting('minimapRotate', this.rotate);
       this.m.toast(`Minimap: ${this.rotate ? 'rotates with car' : 'north up'}`, 'info', 1.5);
+    }
+
+    /** Toggles a minimap/marker filter (keys 1-4). Returns the new state. */
+    setFilter(key, on) {
+      if (!(key in this.filters)) return true;
+      this.filters[key] = !!on;
+      if (window.SaveManager) window.SaveManager.setSetting('mapFilters', this.filters);
+      return this.filters[key];
     }
 
     refreshCash() {
@@ -155,9 +165,13 @@
       if (ev) {
         if (this.eventName) this.eventName.textContent = ev.name;
         if (this.eventTimer) this.eventTimer.textContent = OpenWorldHUD.formatTime(ev.time);
-        if (this.eventPos) this.eventPos.textContent = ev.type === 'timetrial' ? (ev.medalTimes ? `GOLD ${OpenWorldHUD.formatTime(ev.medalTimes.gold)}` : '') : `${window.OpenWorldManager.ordinal(ev.position)} / ${ev.total}`;
+        if (this.eventPos) {
+          if (ev.type === 'timetrial') this.eventPos.textContent = ev.medalTimes ? `GOLD ${OpenWorldHUD.formatTime(ev.medalTimes.gold)}` : '';
+          else if (ev.type === 'drift' && ev.driftTargets) this.eventPos.textContent = `${Math.floor(ev.driftScore || 0)} / ${ev.driftTargets.gold} PTS`;
+          else this.eventPos.textContent = `${window.OpenWorldManager.ordinal(ev.position)} / ${ev.total}`;
+        }
         if (this.eventCp) this.eventCp.textContent = ev.type === 'circuit' ? `LAP ${ev.lap}/${ev.laps} · CP ${ev.checkpoint}/${ev.checkpoints}` : `CP ${ev.checkpoint}/${ev.checkpoints}`;
-        if (this.eventMeta) this.eventMeta.textContent = ev.state === 'countdown' ? 'GET READY' : (ev.state === 'results' ? 'FINISHED' : (ev.type === 'timetrial' ? 'TIME ATTACK' : ev.type.toUpperCase()));
+        if (this.eventMeta) this.eventMeta.textContent = ev.state === 'countdown' ? 'GET READY' : (ev.state === 'results' ? 'FINISHED' : (ev.type === 'timetrial' ? 'TIME ATTACK' : (ev.type === 'drift' ? 'DRIFT' : ev.type.toUpperCase())));
         if (this.eventArrow && ev.next) {
           const dx = ev.next.x - p.position.x; const dz = ev.next.z - p.position.z;
           const ang = Math.atan2(dx, dz) - p.yaw; // relative bearing, + = left
@@ -267,27 +281,46 @@
           ctx.beginPath(); ctx.arc(ax, ay, 3.5, 0, Math.PI * 2); ctx.fillStyle = '#ff7700'; ctx.fill();
         });
       } else {
-        // event markers, garage, discoveries
-        const events = this.m.events ? this.m.events.events : [];
-        events.forEach((e) => {
-          const [mx, my] = map(e.marker.x, e.marker.z);
-          if (mx < -10 || my < -10 || mx > w + 10 || my > h + 10) return;
-          ctx.beginPath();
-          ctx.fillStyle = e.unlocked ? (e.type === 'timetrial' ? '#ffc93c' : '#00f0ff') : '#8a2033';
-          this.diamond(ctx, mx, my, big ? 7 : 6);
-          ctx.fill();
-          if (big) { ctx.fillStyle = '#e8ecff'; ctx.font = '12px Rajdhani, Arial'; ctx.fillText(e.name, mx + 9, my + 4); }
-        });
-        const g = this.m.district.garage.entry;
-        const [gx, gy] = map(g.x, g.z);
-        ctx.fillStyle = '#7dff6a'; ctx.beginPath(); ctx.rect(gx - 5, gy - 5, 10, 10); ctx.fill();
-        if (big) { ctx.fillStyle = '#e8ecff'; ctx.font = '12px Rajdhani, Arial'; ctx.fillText('Garage', gx + 9, gy + 4); }
-        this.m.discoveryMeshes.forEach((m) => {
-          if (!m.visible) return;
-          const d = m.userData.discovery;
-          const [dx, dy] = map(d.x, d.z);
-          ctx.fillStyle = 'rgba(255, 201, 60, 0.85)'; ctx.beginPath(); ctx.arc(dx, dy, big ? 4 : 3, 0, Math.PI * 2); ctx.fill();
-        });
+        // event markers, garage, discoveries, caches (filterable with keys 1-4)
+        if (this.filters.events) {
+          const events = this.m.events ? this.m.events.events : [];
+          events.forEach((e) => {
+            const [mx, my] = map(e.marker.x, e.marker.z);
+            if (mx < -10 || my < -10 || mx > w + 10 || my > h + 10) return;
+            ctx.beginPath();
+            ctx.fillStyle = e.unlocked ? ((e.type === 'timetrial' || e.type === 'drift') ? '#ffc93c' : '#00f0ff') : '#8a2033';
+            this.diamond(ctx, mx, my, big ? 7 : 6);
+            ctx.fill();
+            if (big) { ctx.fillStyle = '#e8ecff'; ctx.font = '12px Rajdhani, Arial'; ctx.fillText(e.name, mx + 9, my + 4); }
+          });
+        }
+        if (this.filters.garage) {
+          const g = this.m.district.garage.entry;
+          const [gx, gy] = map(g.x, g.z);
+          ctx.fillStyle = '#7dff6a'; ctx.beginPath(); ctx.rect(gx - 5, gy - 5, 10, 10); ctx.fill();
+          if (big) { ctx.fillStyle = '#e8ecff'; ctx.font = '12px Rajdhani, Arial'; ctx.fillText('Garage', gx + 9, gy + 4); }
+        }
+        if (this.filters.discoveries) {
+          this.m.discoveryMeshes.forEach((m) => {
+            if (!m.visible) return;
+            const d = m.userData.discovery;
+            const [dx, dy] = map(d.x, d.z);
+            ctx.fillStyle = 'rgba(255, 201, 60, 0.85)'; ctx.beginPath(); ctx.arc(dx, dy, big ? 4 : 3, 0, Math.PI * 2); ctx.fill();
+          });
+        }
+        if (this.filters.caches) {
+          (this.m.cacheMeshes || []).forEach((m) => {
+            if (!m.visible) return;
+            const c = m.userData.cache;
+            const [cx2, cy2] = map(c.x, c.z);
+            ctx.fillStyle = '#37ff9e'; ctx.beginPath(); ctx.rect(cx2 - 3, cy2 - 3, 6, 6); ctx.fill();
+            if (big) { ctx.fillStyle = '#e8ecff'; ctx.font = '12px Rajdhani, Arial'; ctx.fillText(c.name, cx2 + 9, cy2 + 4); }
+          });
+        }
+        if (big) {
+          ctx.fillStyle = 'rgba(232, 236, 255, 0.75)'; ctx.font = '12px Rajdhani, Arial'; ctx.textAlign = 'left';
+          ctx.fillText('1 events · 2 garage · 3 discoveries · 4 caches', 12, h - 12);
+        }
       }
 
       // traffic (near only)

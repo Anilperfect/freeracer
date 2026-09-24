@@ -67,6 +67,22 @@
       dimensions: { length: 4.72, width: 2.04, height: 1.14, wheelbase: 2.78, groundClearance: 0.100, curbWeightKg: 1520 },
       stats: { topSpeed: 98, acceleration: 97, handling: 90, braking: 94, grip: 92, stability: 88 },
       physics: { maxSpeed: 100.0, acceleration: 40.0, brakeDecel: 46.0, maxSteerAngle: 0.50, highSpeedSteer: 0.10, driftMultiplier: 1.05, nitroCapacity: 125.0, lateralAgility: 24.5, cdA: 0.70, clA: 2.0, downforceCoeff: 0.0055 }
+    },
+    {
+      template: 'veloce_v8_gt', bodyStyle: 'truck',
+      id: 'ironclad_ridgeback', name: 'Ironclad Ridgeback', manufacturer: 'Ironclad Motors', manufacturerId: 'ironclad',
+      carClass: 'Off-Road Truck', archetype: 'offroad',
+      description: 'A lifted 4x4 crew-cab built for sand, dirt and kerbs. Slow on the highway, unstoppable everywhere else.',
+      colorHex: 0x5a6b3c, price: 18000, tier: 3, accentColor: 0xff9a1a, spokeCount: 6,
+      engine: { type: '5.0L Supercharged V8', displacement: '5.0L', redline: 6500, transmission: '6-Speed Automatic', gearCount: 6, audioProfile: 'v8_turbo', exhaustLayout: 'dual_split', peakPowerKw: 390, peakTorqueNm: 720, drivetrain: 'AWD' },
+      dimensions: { length: 5.10, width: 2.05, height: 1.85, wheelbase: 3.10, groundClearance: 0.280, curbWeightKg: 2150 },
+      anchorLift: 0.35,
+      wheels: {
+        front: { rimDiameterInches: 18, radius: 0.42, width: 0.30, rimRadius: 0.228 },
+        rear: { rimDiameterInches: 18, radius: 0.42, width: 0.30, rimRadius: 0.228 }
+      },
+      stats: { topSpeed: 64, acceleration: 76, handling: 68, braking: 74, grip: 80, stability: 86 },
+      physics: { maxSpeed: 61.1, acceleration: 26.0, brakeDecel: 36.0, maxSteerAngle: 0.58, highSpeedSteer: 0.13, driftMultiplier: 0.9, nitroCapacity: 100.0, lateralAgility: 19.0, cdA: 0.92, clA: -0.3, downforceCoeff: 0.0020 }
     }
   ];
 
