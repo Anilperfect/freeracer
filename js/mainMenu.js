@@ -6,8 +6,8 @@
  * cinematic backdrop for the menu.
  */
 (function () {
-  const GAME_VERSION = 'v0.6.1 — Neon Coast complete';
-  window.FREERACER_VERSION = 'v0.6.1';
+  const GAME_VERSION = 'v0.7.0 — Neon Auto Exchange';
+  window.FREERACER_VERSION = 'v0.7.0';
 
   class MainMenuManager {
     constructor(game) {
@@ -35,6 +35,7 @@
       const on = (id, fn) => { const el = document.getElementById(id); if (el) el.addEventListener('click', fn); };
       on('btn-mm-drive', () => this.startFreeRoam());
       on('btn-mm-garage', () => this.openGarage());
+      on('btn-mm-shop', () => this.openShop());
       on('btn-mm-circuits', () => this.openCircuits());
       on('btn-mm-settings', () => this.game.openSettings());
       on('btn-mm-credits', () => this.showCredits(true));
@@ -127,6 +128,7 @@
       if (settings && settings.style.display === 'flex') return;
       if (e.code === 'Enter' || e.code === 'Space') { e.preventDefault(); this.startFreeRoam(); }
       if (e.code === 'KeyG') this.openGarage();
+      if (e.code === 'KeyS') this.openShop();
       if (e.code === 'Escape') this.showCredits(false);
     }
 
@@ -194,6 +196,12 @@
     openGarage() {
       this.hideMenu();
       this.game.enterGarageFromMenu();
+    }
+
+    openShop() {
+      if (!window.ShopManager) { this.flash('Shop is unavailable in this build.'); return; }
+      this.hideMenu();
+      window.ShopManager.open({ game: this.game, from: 'menu' });
     }
 
     openCircuits() {

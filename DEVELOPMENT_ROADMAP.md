@@ -46,6 +46,7 @@ the session report); the world is flat (no heightmap yet); the rival roster reus
 - ✅ Off-Road Truck archetype + dedicated mesh — **Ironclad Ridgeback** shipped in v0.6.1 (`bodyStyle: 'truck'`, 18" wheels, lifted anchors)
 - ⬜ Dyno / before-after graph view (bars with deltas ship now; graph is cosmetic)
 - ✅ Extended cosmetics (v0.6.1: secondary paint, brake calipers, bolt-on spoilers, window tint); ⬜ body kits, wheel size, plates, decals
+- ✅ Neon Auto Exchange (v0.7.0): dedicated shop from main menu + pause menu — buy/sell cars (60% sticker + 50% parts salvage; starter/current/last car protected), buy/refund part stages (50%)
 - ⬜ Per-drivetrain handling personality pass (FWD/RWD/AWD launch + throttle-steer differences)
 
 ## Phase 3 — Open-world expansion 🟨 (v0.6.1 — Neon Coast trio done, highways/streaming pending)

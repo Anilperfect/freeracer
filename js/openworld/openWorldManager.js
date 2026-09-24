@@ -1048,6 +1048,11 @@
       on('btn-ow-quit-event', () => this.quitEvent());
       on('btn-ow-travel', () => { const sel = this.dom.districtSelect; if (sel && sel.value) this.switchDistrict(sel.value, 'garage'); });
       on('btn-ow-garage', () => { this.closePauseMenu(); this.enterGarage(); });
+      on('btn-ow-shop', () => {
+        if (this.dom.pause) this.dom.pause.classList.add('hidden');
+        this.pauseMenuOpen = true; // keep the world paused while the shop is open
+        if (window.ShopManager) window.ShopManager.open({ game: this.game, from: 'pause' });
+      });
       on('btn-ow-settings', () => { if (this.dom.pause) this.dom.pause.classList.add('hidden'); this.pauseMenuOpen = false; this.game.openSettings(); });
       on('btn-ow-main-menu', () => { this.closePauseMenu(); this.game.goToMainMenu(); });
       on('btn-ow-results-continue', () => this.continueFromResults());

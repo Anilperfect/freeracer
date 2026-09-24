@@ -128,6 +128,28 @@
       return 'ok';
     }
 
+    /** Cash refunded (50% of stage cost) for removing the TOP stage, or null when stock. */
+    getUninstallRefund(carId, catId) {
+      const cat = this.getCategory(catId);
+      const stage = this.getParts(carId)[catId] || 0;
+      if (!cat || stage <= 0) return null;
+      const car = window.getCarById ? window.getCarById(carId) : null;
+      const cost = Math.round(this.catalog.stageBaseCost[stage - 1] * cat.costWeight * UpgradeSystem.tierFactor(car) / 10) * 10;
+      return Math.round(cost * 0.5 / 10) * 10;
+    }
+
+    /** @returns {'ok'|'stock'|'error'} — removes the top stage of a category and refunds 50% of its cost (Auto Exchange). */
+    uninstall(carId, catId) {
+      const p = this.ensureProfile();
+      if (!p) return 'error';
+      const refund = this.getUninstallRefund(carId, catId);
+      if (refund === null) return 'stock';
+      p.parts[carId][catId] = (p.parts[carId][catId] || 0) - 1;
+      this.save.addCash(refund);
+      this.save.save();
+      return 'ok';
+    }
+
     totalInvested(carId) {
       const parts = this.getParts(carId);
       const car = window.getCarById ? window.getCarById(carId) : null;

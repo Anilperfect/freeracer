@@ -227,6 +227,21 @@
       return true;
     }
 
+    /**
+     * Remove a car from the player's garage (Auto Exchange sale).
+     * Permanently-granted starter cars cannot be removed.
+     * @returns {boolean} true when the car was actually removed
+     */
+    removeCar(carId) {
+      if (!carId || carId === 'veloce_v10_corsa' || carId === 'falcon_s1') return false;
+      if (!this.profile.unlockedCars) return false;
+      const i = this.profile.unlockedCars.indexOf(carId);
+      if (i < 0) return false;
+      this.profile.unlockedCars.splice(i, 1);
+      this.save();
+      return true;
+    }
+
     getSelectedCarId() {
       const id = this.profile.selectedCarId;
       if (id && window.getCarById && window.getCarById(id) && this.isCarUnlocked(id)) return id;

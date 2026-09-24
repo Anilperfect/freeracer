@@ -38,6 +38,7 @@
       <nav class="mm-nav">
         <button class="mm-btn primary" id="btn-mm-drive"><span class="mm-btn-title">DRIVE</span><span class="mm-btn-sub" id="btn-mm-drive-sub">Free roam · Apex Downtown</span></button>
         <button class="mm-btn" id="btn-mm-garage"><span class="mm-btn-title">GARAGE</span><span class="mm-btn-sub">Cars · Upgrades · Paint</span></button>
+        <button class="mm-btn" id="btn-mm-shop"><span class="mm-btn-title">SHOP</span><span class="mm-btn-sub">Auto Exchange · Buy & sell cars and parts</span></button>
         <button class="mm-btn" id="btn-mm-circuits"><span class="mm-btn-title">CIRCUIT EVENTS</span><span class="mm-btn-sub">Anti-gravity circuits · 4 tracks</span></button>
         <button class="mm-btn" id="btn-mm-settings"><span class="mm-btn-title">SETTINGS</span><span class="mm-btn-sub">Graphics · Audio · Camera</span></button>
         <button class="mm-btn" id="btn-mm-credits"><span class="mm-btn-title">CREDITS</span><span class="mm-btn-sub">About FreeRacer</span></button>
@@ -136,6 +137,31 @@
   </div>
 
   <!-- MAP SELECTION SCREEN -->
+  <!-- Neon Auto Exchange / shop (v0.7.0) -->
+  <div id="shop-screen" class="screen-overlay shop-screen" style="display: none;">
+    <div class="shop-top">
+      <button class="ws-btn" id="btn-shop-back" title="Back (Esc)">◀ BACK</button>
+      <div class="shop-heading">
+        <h1 class="shop-title">NEON AUTO EXCHANGE</h1>
+        <div class="shop-tagline">Buy &amp; sell · Cars and performance parts · No real money, just street credit</div>
+      </div>
+      <div class="shop-cash-wrap">
+        <div class="shop-cash" id="shop-cash">₡ 0</div>
+        <div class="shop-level" id="shop-level"></div>
+      </div>
+    </div>
+    <div class="shop-tabs">
+      <button class="shop-tab active" id="shop-tab-cars">🚗 CARS</button>
+      <button class="shop-tab" id="shop-tab-parts">⚙ PARTS</button>
+    </div>
+    <div class="shop-sub" id="shop-sub"></div>
+    <div class="shop-body">
+      <div class="shop-grid" id="shop-cars-panel"></div>
+      <div class="shop-parts-panel" id="shop-parts-panel" style="display: none;"></div>
+    </div>
+    <div class="shop-flash hidden" id="shop-flash"></div>
+  </div>
+
   <div id="map-select-screen" class="screen-overlay hidden" style="display: none;">
 
     <!-- Hero Background Image -->
@@ -349,6 +375,7 @@
         <button class="ws-btn" id="btn-ow-restart-event">RESTART EVENT</button>
         <button class="ws-btn danger" id="btn-ow-quit-event">ABANDON EVENT</button>
         <button class="ws-btn" id="btn-ow-garage">GARAGE</button>
+        <button class="ws-btn" id="btn-ow-shop">SHOP</button>
         <button class="ws-btn" id="btn-ow-settings">SETTINGS</button>
         <button class="ws-btn danger" id="btn-ow-main-menu">MAIN MENU 🏠</button>
       </div>
@@ -654,6 +681,7 @@
   <script src="js/streaming.js"></script>
   <script src="js/damage.js"></script>
   <script src="js/workshop.js"></script>
+  <script src="js/shop.js"></script>
   <script src="js/mapSelect.js"></script>
 
   <!-- FreeRacer open world -->
